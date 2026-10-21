@@ -11,7 +11,7 @@ admin workflow & escalation → dashboards & notifications → hardening & recov
 | Phase | Name | Status |
 |---|---|---|
 | 0 | Decisions, spikes & scaffold | 🟨 Scaffold done; deployed spike waits on accounts (TODO.md) |
-| 1 | Design system | ⬜ Not started |
+| 1 | Design system | ✅ Done (real-phone/axe pass deferred to Phase 7) |
 | 2 | Foundation: roster, auth, roles, audit | ⬜ Not started |
 | 3 | Complaint core: submit, route, upload, feed | ⬜ Not started |
 | 4 | Workflow: assign, status, deadlines, escalate, resolve, close, reopen | ⬜ Not started |
@@ -94,38 +94,38 @@ tests/rules/, tests/e2e/
 
 **Goal:** one coherent, accessible, mobile-first visual language before feature screens. Direction (PRD Appendix A, Round 4): *friendly campus-community, trustworthy, calm* — not a corporate ticketing tool.
 
-**Tokens** (CSS variables → Tailwind theme, in `src/app/globals.css`)
-- [ ] Color: neutrals, one primary brand hue, accent, and semantic tokens (success/warning/danger/info)
-- [ ] Status palette: Submitted, Assigned, In progress, Resolved, Closed, Reopened, Escalated. Each pairs a color with an icon and label, so color is never the only signal.
-- [ ] Priority palette: Critical, High, Normal, Low
-- [ ] Type scale (system or one free Google font), spacing scale, radii, elevation, motion durations (respect `prefers-reduced-motion`)
-- [ ] Light theme first. Define dark tokens too, since it's cheap once tokens exist; shipping dark is optional.
+**Decided direction: "the hostel complaint register."** Ballpoint-blue ink (`--ink #2433A6`) on cool register paper (`--paper #F6F7F9`, `--sheet #FFF`), graphite text, ruled lines (`--rule`). A highlighter yellow (`--highlight #FFE45C`) marks the single pending action on a screen and is used nowhere else. Type is Atkinson Hyperlegible Next only (built for low-vision legibility), 16px body, minor-third scale. Each screen gets one sheet (`Panel`), and lists inside it are ruled rather than boxed as separate cards. Radius hierarchy: surface 16 > control 10 > thumbnail 8, with pill chips. Shadows only on overlays. Dark theme is a "night corridor" navy, not black.
+
+**Tokens** (`src/app/globals.css`: CSS variables → Tailwind `@theme inline`)
+- [x] Color: neutrals, ink primary, highlighter, semantic success/warning/danger/info, light + dark
+- [x] Status palette: Submitted, Assigned, In progress, Resolved, Closed, Reopened. Each pairs color + icon + label. **Escalated is a separate badge**, because it's a flag/event rather than a status (PRD §6.1).
+- [x] Priority: signal-bar glyph + word. Only Critical/High carry color.
+- [x] Type scale, radii, overlay shadow, motion (`sheet-in`, `fade-in`). Reduced motion is honoured globally.
+- [x] Contrast: every text/background pair checked with a WCAG script. Light ranges 5.8–14.5:1, dark 6.2–14.8:1, input borders 3.1:1.
 
 **Primitives** (`src/components/ui/`)
-- [ ] Button (primary/secondary/ghost/destructive, loading), IconButton
-- [ ] Input, Textarea with counter (max lengths), Select, Combobox (category/location), Checkbox, Radio, Switch
-- [ ] Field wrapper (label, hint, error, required), Form error summary
-- [ ] Card, Badge (status/priority), Tag, Avatar/pseudonym chip
-- [ ] Dialog, Sheet (mobile bottom sheet), DropdownMenu, Tabs, Tooltip
-- [ ] Toast, Alert/Banner, Skeleton, Spinner, EmptyState, ErrorState
-- [ ] Pagination / "Load more", Table (admin, responsive collapse to cards)
-- [ ] Image thumbnail + lightbox, upload dropzone with per-file progress/error
+- [x] `button.tsx`: Button (primary/secondary/ghost/destructive, loading, icon), IconButton (label required), `buttonClass()` for links
+- [x] `field.tsx`: Field (label/hint/error/required wired by context), Input, Textarea (required `maxLength` + counter), Select (native), Checkbox, Radio, **OptionCard** (radio card), Switch, FormErrorSummary. *Combobox dropped:* category uses OptionCards and location uses cascading native selects, which work better on phones.
+- [x] `badge.tsx`: StatusBadge, EscalatedBadge, PriorityBadge, Tag, TicketId (tabular figures), Highlight, Pseudonym chip
+- [x] `overlay.tsx` (Radix): Dialog with `sheet` (bottom sheet on phones) / `center` variants, Menu, Tabs (scrollable underline), Tooltip
+- [x] `toast.tsx` (Radix Toast): `ToastProvider` in root layout, `useToast()`
+- [x] `feedback.tsx`: Banner (tones; `danger` uses role=alert), EmptyState (always with a next step), ServiceUnavailable
+- [x] `spinner.tsx`: Spinner, Skeleton
+- [x] `surface.tsx`: Panel, RuledList, LoadMore (cursor pagination, no page numbers), DataTable (table on md+, stacked rows on phones)
+- [x] `media.tsx`: Thumbnail + lightbox, UploadDropzone (per-file progress/error; caller does validation). Uses plain `<img>`, since signed URLs mustn't go through the Next image cache.
 
-**Patterns**
-- [ ] App shell: mobile bottom tab bar (Feed, My complaints, New, Notifications, More), desktop sidebar. Role-aware nav for admin/committee.
-- [ ] Public issue card (safe location label, status, priority, support count, photo thumb, age)
-- [ ] Complaint detail with status timeline
-- [ ] Guided multi-step complaint form (category → location → details → photos → visibility review)
-- [ ] Notification item + unread badge
-- [ ] Global banners: "Student-led pilot — not an official IIT Kanpur channel" and "Emergency? Call …" (not a substitute for emergency help)
-- [ ] Quota/service-unavailable state that says the draft is saved, never silently dropped
-- [ ] Public-photo notice ("photos on public complaints are visible to all users")
+**Patterns** (`src/components/`)
+- [x] `app-shell.tsx`: mobile bottom tab bar (Feed, Mine, raised New, Alerts, More), desktop sidebar with role items (Admin queue / Committee), skip link, unread badge
+- [x] `issue.tsx`: IssueRow (stretched-link feed row), LocationPath (chevron path; never a room number), StatusTimeline, Stepper, `PublicIssue` view type
+- [x] `notices.tsx`: PilotNotice (always on in the shell), EmergencyNotice (tel: links), PublicPhotoNotice, NotificationItem
+- [x] Complaint detail and the guided form get assembled from these in Phase 3. The gallery shows the pieces.
 
 **Quality bar**
-- [ ] WCAG 2.2 AA contrast for all token pairs, visible focus rings, 44×44 px touch targets, labelled controls, keyboard-complete dialogs
-- [ ] Dev-only gallery route `/dev/design` rendering every primitive and state (404 in production)
+- [x] AA contrast (script), 3px focus ring on every focusable, 44px targets (audited in browser; checkbox/radio hit areas are their 44px label rows), labelled controls, Radix keyboard handling for dialogs/menus/tabs
+- [x] `/dev/design` gallery (`src/app/dev/design/`) renders every primitive and state. Production build returns 404 (verified with `next start`).
+- [ ] Real-phone check and axe pass, done in the Phase 7 accessibility sweep
 
-**Exit:** gallery complete, contrast verified, primitives used unchanged by Phase 2 screens.
+**Exit:** gallery complete, contrast verified ✅. Phase 2 screens must use these primitives, not one-off styles.
 
 ---
 
@@ -352,4 +352,5 @@ Email/WhatsApp/SMS, PWA install, maps, staff accounts, multi-hostel, institution
 ## Change log
 
 - 2026-10-21: Plan created from PRD v1.0.
+- 2026-10-21: Phase 1 design system landed (radix-ui, lucide-react, clsx). Gallery at `/dev/design`.
 - 2026-10-21: Phase 0 scaffold landed (Next 16.4.2, React 19.3, firebase 13.1, firebase-admin 14.5, zod 4, vitest 5). Emulator tests green.

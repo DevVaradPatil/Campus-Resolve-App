@@ -39,6 +39,13 @@ Stack: Next.js App Router + TypeScript (strict), Tailwind, Firebase Auth (custom
 - **Uploads:** check magic bytes (JPEG/PNG/WebP only), re-encode with `sharp` to strip EXIF, use server-generated object keys, and serve private images only via short-lived signed URLs.
 - **Quota-aware:** paginate everything (≤20 per page), keep listeners scoped to visible records, and read dashboards from pre-aggregated `stats` docs. On failure, surface a clear error and never drop a submission.
 
+## UI conventions
+
+- Build screens from `src/components/ui/*` and `src/components/*` and their tokens (`bg-sheet`, `text-ink`, `text-muted`, `border-rule`, `bg-st-*`...). Don't use raw Tailwind palette colors (`blue-600`) or hex values. See `/dev/design` (dev only) for every primitive. Add new primitives there too.
+- `Highlight` (yellow) marks the one pending user action on a screen, and nothing else.
+- Every free-text input has a `maxLength`. Every interactive element has a 44px target. Icon-only buttons go through `IconButton` (label required).
+- Dates go through `formatDateTime` (fixed `en-IN` / `Asia/Kolkata`) so server and client render identically.
+
 ## Constraints
 
 - Never add a paid service, or a provider that needs billing details, without the owner's explicit approval (PRD §8.4).

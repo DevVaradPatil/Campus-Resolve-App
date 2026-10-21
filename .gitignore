@@ -49,3 +49,6 @@ ui-debug.log*
 emulator-data/
 *-firebase-adminsdk-*.json
 service-account*.json
+
+# local tooling
+.claude/launch.json
