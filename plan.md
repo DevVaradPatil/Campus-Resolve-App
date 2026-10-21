@@ -94,14 +94,14 @@ tests/rules/, tests/e2e/
 
 **Goal:** one coherent, accessible, mobile-first visual language before feature screens. Direction (PRD Appendix A, Round 4): *friendly campus-community, trustworthy, calm* — not a corporate ticketing tool.
 
-**Decided direction: "the hostel complaint register."** Ballpoint-blue ink (`--ink #2433A6`) on cool register paper (`--paper #F6F7F9`, `--sheet #FFF`), graphite text, ruled lines (`--rule`). A highlighter yellow (`--highlight #FFE45C`) marks the single pending action on a screen and is used nowhere else. Type is Atkinson Hyperlegible Next only (built for low-vision legibility), 16px body, minor-third scale. Each screen gets one sheet (`Panel`), and lists inside it are ruled rather than boxed as separate cards. Radius hierarchy: surface 16 > control 10 > thumbnail 8, with pill chips. Shadows only on overlays. Dark theme is a "night corridor" navy, not black.
+**Decided direction: "the hostel complaint register."** Ballpoint-blue ink (`--ink #2433A6`) on cool register paper (`--paper #F6F7F9`, `--sheet #FFF`), graphite text, ruled lines (`--rule`). A highlighter yellow (`--highlight #FFE45C`) marks the single pending action on a screen and is used nowhere else. Type is Atkinson Hyperlegible Next only (built for low-vision legibility), 16px body, minor-third scale. Each screen gets one sheet (`Panel`), and lists inside it are ruled rather than boxed as separate cards. Radius hierarchy: surface 16 > control 10 > thumbnail 8, with pill chips. Shadows only on overlays. Dark theme is blue-black (`--paper #080B14`, `--sheet #0F1320`), darker than navy but not pure black.
 
 **Tokens** (`src/app/globals.css`: CSS variables → Tailwind `@theme inline`)
 - [x] Color: neutrals, ink primary, highlighter, semantic success/warning/danger/info, light + dark
 - [x] Status palette: Submitted, Assigned, In progress, Resolved, Closed, Reopened. Each pairs color + icon + label. **Escalated is a separate badge**, because it's a flag/event rather than a status (PRD §6.1).
 - [x] Priority: signal-bar glyph + word. Only Critical/High carry color.
 - [x] Type scale, radii, overlay shadow, motion (`sheet-in`, `fade-in`). Reduced motion is honoured globally.
-- [x] Contrast: every text/background pair checked with a WCAG script. Light ranges 5.8–14.5:1, dark 6.2–14.8:1, input borders 3.1:1.
+- [x] Contrast: every text/background pair checked with a WCAG script. Light ranges 5.8–14.5:1, dark 6.4–16.2:1, input borders 3.1:1.
 
 **Primitives** (`src/components/ui/`)
 - [x] `button.tsx`: Button (primary/secondary/ghost/destructive, loading, icon), IconButton (label required), `buttonClass()` for links

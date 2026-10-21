@@ -116,7 +116,10 @@ const EMERGENCY = [
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-4 border-t border-rule pt-8">
+    <section
+      id={title.toLowerCase().replace(/\W+/g, "-")}
+      className="flex scroll-mt-4 flex-col gap-4 border-t border-rule pt-8"
+    >
       <h2 className="text-xl font-bold">{title}</h2>
       {children}
     </section>
