@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Atkinson_Hyperlegible_Next } from "next/font/google";
 import { ToastProvider } from "@/components/ui/toast";
+import { AuthProvider } from "@/lib/client/auth";
 import "./globals.css";
 
 const atkinson = Atkinson_Hyperlegible_Next({
@@ -24,7 +25,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${atkinson.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col">
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ToastProvider>
       </body>
     </html>
   );

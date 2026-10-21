@@ -29,7 +29,7 @@ const STUDENT: NavItem[] = [
 const ROLE_ITEMS: Record<Role, NavItem[]> = {
   student: [],
   committee: [{ href: "/committee", label: "Committee", icon: Flag }],
-  admin: [{ href: "/admin", label: "Admin queue", icon: Inbox }],
+  admin: [{ href: "/admin", label: "Admin", icon: Inbox }],
 };
 
 const isActive = (path: string, href: string) =>

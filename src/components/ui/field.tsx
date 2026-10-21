@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Eye, EyeOff } from "lucide-react";
 import {
   createContext,
   useContext,
@@ -82,6 +82,30 @@ export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputEleme
   return <input className={clsx(control, "h-11", className)} {...useField()} {...rest} />;
 }
 
+/** Password input with a show/hide toggle (helps on phones, where typos are common). */
+export function PasswordInput({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        type={shown ? "text" : "password"}
+        className={clsx(control, "h-11 pr-12", className)}
+        {...useField()}
+        {...rest}
+      />
+      <button
+        type="button"
+        onClick={() => setShown((v) => !v)}
+        aria-label={shown ? "Hide password" : "Show password"}
+        aria-pressed={shown}
+        className="absolute inset-y-0 right-0 grid w-11 place-items-center text-muted hover:text-text"
+      >
+        {shown ? <EyeOff aria-hidden className="size-5" /> : <Eye aria-hidden className="size-5" />}
+      </button>
+    </div>
+  );
+}
+
 /** Textarea with a live character count. `maxLength` is required: every free-text field is capped. */
 export function Textarea({
   className,
@@ -92,7 +116,8 @@ export function Textarea({
   ...rest
 }: TextareaHTMLAttributes<HTMLTextAreaElement> & { maxLength: number }) {
   const field = useField();
-  const [count, setCount] = useState(String(value ?? defaultValue ?? "").length);
+  const [typed, setTyped] = useState(String(defaultValue ?? "").length);
+  const count = value !== undefined ? String(value).length : typed;
   const near = count > maxLength * 0.9;
   return (
     <div className="flex flex-col gap-1">
@@ -102,7 +127,7 @@ export function Textarea({
         defaultValue={defaultValue}
         value={value}
         onChange={(e) => {
-          setCount(e.target.value.length);
+          setTyped(e.target.value.length);
           onChange?.(e);
         }}
         {...field}

@@ -11,7 +11,8 @@
     "format": "prettier --write .",
     "test": "vitest run --dir src --passWithNoTests",
     "emulators": "firebase emulators:start --project demo-campusresolve",
-    "test:emu": "firebase emulators:exec --only auth,firestore --project demo-campusresolve \"vitest run --dir tests\""
+    "test:emu": "firebase emulators:exec --only auth,firestore --project demo-campusresolve \"vitest run --dir tests --no-file-parallelism\"",
+    "create-admin": "tsx --env-file=.env.local --conditions=react-server scripts/create-admin.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -36,6 +37,7 @@
     "firebase-tools": "^15.34.0",
     "prettier": "^3.9.10",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5",
     "vitest": "^5.0.5"
   },

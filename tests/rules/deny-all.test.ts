@@ -18,7 +18,16 @@ beforeAll(async () => {
 
 afterAll(() => testEnv.cleanup());
 
-const collections = ["users", "roster", "complaints", "auditLogs", "notifications"];
+const collections = [
+  "users",
+  "accounts",
+  "roster",
+  "activationCodes",
+  "rateLimits",
+  "complaints",
+  "auditLogs",
+  "notifications",
+];
 
 describe("default-deny rules", () => {
   for (const name of collections) {

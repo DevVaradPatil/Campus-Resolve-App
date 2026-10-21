@@ -12,7 +12,7 @@ admin workflow & escalation → dashboards & notifications → hardening & recov
 |---|---|---|
 | 0 | Decisions, spikes & scaffold | 🟨 Scaffold done; deployed spike waits on accounts (TODO.md) |
 | 1 | Design system | ✅ Done (real-phone/axe pass deferred to Phase 7) |
-| 2 | Foundation: roster, auth, roles, audit | ⬜ Not started |
+| 2 | Foundation: roster, auth, roles, audit | ✅ Done (security review in Phase 7) |
 | 3 | Complaint core: submit, route, upload, feed | ⬜ Not started |
 | 4 | Workflow: assign, status, deadlines, escalate, resolve, close, reopen | ⬜ Not started |
 | 5 | Community & notifications | ⬜ Not started |
@@ -133,38 +133,43 @@ tests/rules/, tests/e2e/
 
 **Goal:** verified activation, secure login, server-enforced roles, audit trail from day one (PRD §4.1, §9, §3).
 
-Domain & data
-- [ ] `normalizeRollNumber()`: a single function used everywhere
-- [ ] Firestore types + zod schemas: `users`, `roster`, `activationCodes`, `auditLogs`, `rateLimits`, `systemSettings`
-- [ ] Permissions model: role (`student` | `committee` | `admin`) + explicit grant list (e.g. `committee.viewReporter`, `committee.manageContacts`), stored in `users/{uid}`. Mirror role into custom claims only for rules convenience; the source of truth stays server-side.
+**Data model (as built)**, all server-only (rules deny clients):
+- `users/{uid}`: profile + `role` + `grants` + `active` + public `pseudonym`. UID is random and stable across room changes.
+- `accounts/{loginId}`: credentials only (`uid`, scrypt `passwordHash`). `loginId` is the normalized roll number for students and `admin:<handle>` for admins, so admin credentials are always separate (PRD §9.2).
+- `roster/{rollNumber}`: eligibility, name, block/floor/room, linked `uid` once activated.
+- `activationCodes/{rollNumber}`: one live code per student, stored as an HMAC bound to the roll number, 7-day expiry, `consumedAt`.
+- `rateLimits/{sha256(key)}`: fixed-window counters with `expiresAt` (TTL policy, see TODO.md). `auditLogs/{id}`: append-only.
 
-Server
-- [ ] `lib/server/audit.ts`: `writeAudit(tx, {actorUid, action, target, outcome, meta})`, append-only, never logs secrets or confidential payloads
-- [ ] `lib/server/rateLimit.ts`: Firestore transactional fixed-window counters, keyed per account and per hashed IP (HMAC with server secret). Limits come from PRD §12.2 and are configurable. Generous IP limits because of shared campus NAT.
-- [ ] `lib/server/auth.ts`: `requireUser(req)` verifies the ID token, loads the user and rejects `active=false`. `requirePermission(user, perm)`.
-- [ ] `scripts/create-admin.ts`: bootstraps the first admin from the CLI using a service account (separate admin credentials, PRD §9.2)
-- [ ] Roster import API (admin): CSV upload → validate → diff preview → apply. Creates/updates `roster`, marks removed students ineligible and deactivates their accounts. Audited.
-- [ ] Activation code generation (admin): random 10+ chars from an unambiguous alphabet, stored as HMAC-SHA256 hash, 7-day expiry, one active code per roll number. Printable/CSV handout for the admin.
-- [ ] `POST /api/auth/activate`: roll number + code + new password → verify (constant-time, rate-limited, generic errors) → consume code in a transaction → create `users/{uid}` with a stable random UID → scrypt hash → custom token
-- [ ] `POST /api/auth/login`: roll number + password → rate limit (account + IP) → generic error on any failure → custom token
-- [ ] `POST /api/auth/change-password` (authed)
-- [ ] Admin-controlled reset: admin issues a fresh activation code and invalidates the old password + refresh tokens (`revokeRefreshTokens`). Audited.
-- [ ] Account deactivation: sets `active=false` and revokes refresh tokens. `requireUser` checks `active` on every request, so it takes effect immediately.
-- [ ] Room change updates profile only. UID unchanged. Audited.
+Domain & data
+- [x] `normalizeRollNumber()` / `toLoginId()` (`src/lib/domain/identity.ts`)
+- [x] zod input schemas (`schemas.ts`), server doc types (`src/lib/server/types.ts`)
+- [x] Permissions (`permissions.ts`): role base sets + explicit committee `grants`. Grants can never unlock roster, roles or confidential access. Custom claims are not the source of truth: `requireUser()` reads `users/{uid}` every request.
+- [x] Pseudonyms (`pseudonym.ts`), assigned once at activation
+
+Server (`src/lib/server/`)
+- [x] `audit.ts`: `writeAudit()` inside the same transaction/batch as the change, plus `audit()` for standalone failures
+- [x] `rate-limit.ts`: transactional fixed window, per account + per HMAC-hashed IP (limits from PRD §12.2, IP limits generous for campus NAT)
+- [x] `auth.ts`: `requireUser()` (token + active check every request), `requirePermission()`, `toMe()`
+- [x] `crypto.ts`: scrypt hashing (N=2^15), dummy-hash timing equalization, activation code generation/HMAC, IP hashing
+- [x] `http.ts`: `route()` wrapper (HttpError/ZodError → JSON, everything else → generic 500), `readJson()`, `clientIp()`
+- [x] `accounts.ts`: activate, login, changePassword, issueCodes (doubles as the **admin-controlled reset**: clears the password hash and revokes sessions), setActive, changeRoom, setRole (admin role only on admin-namespace accounts, never on yourself), importRoster (preview/apply, removed or ineligible students deactivated), createAdmin
+- [x] `scripts/create-admin.ts` → `npm run create-admin -- <handle> "<Name>"` (hidden password prompt)
+- [x] Routes: `POST /api/auth/{activate,login,change-password}`, `GET /api/me`, `GET /api/admin/roster`, `POST /api/admin/roster/{import,codes}`, `POST /api/admin/roster/[roll]/room`, `POST /api/admin/users/[uid]/{active,role}`
 
 Client
-- [ ] Firebase client init, auth context, `authedFetch()` that attaches a fresh ID token
-- [ ] Screens: Activate, Login, Change password, Profile (room is display data only)
-- [ ] Route guards (UI convenience only)
-- [ ] Admin: Roster page (import, list, search, deactivate, issue code, change room)
+- [x] `src/lib/client/api.ts` (authed fetch, ApiError) and `auth.tsx` (AuthProvider, `useAuth`, session from Firebase client SDK, profile from `/api/me`, auto sign-out on 401)
+- [x] `(auth)` screens: `/login`, `/activate`, `/admin/login`. `(app)` screens behind `RequireAuth`: feed placeholder, `/more` (profile, change password, sign out), `/admin`, `/admin/roster` (CSV import with preview, search, codes handout + CSV download, reset, deactivate/reactivate, room change, committee toggle)
+- [x] `PasswordInput` primitive (show/hide), added to the gallery
+- [x] `next.config.ts`: `instantInsights.validationLevel: "manual-warning"`, because signed-in screens are client-rendered by design (D5)
 
 Rules & tests
-- [ ] `firestore.rules`: deny by default, no client writes anywhere
-- [ ] Rules tests: unauthenticated and authenticated clients cannot write any collection or read `users`/`roster`/`activationCodes`/`auditLogs`
-- [ ] Unit tests: roll-number normalization, code hashing/expiry, rate-limit window math
-- [ ] Integration tests (emulator): activation happy path, replayed code (FR-02), expired code, non-roster roll number (FR-01), login lockout after 5 attempts, deactivated user rejected
+- [x] Rules: still deny-all. Tests cover users, accounts, roster, activationCodes, rateLimits, complaints, auditLogs, notifications.
+- [x] Unit (20): identity, permissions, CSV/roster parse + diff, scrypt + codes, rate-limit window
+- [x] Integration (emulator, 18): import preview/apply/errors/removal, activation happy path, replay (FR-02), expiry, cross-roll code, off-roster/ineligible (FR-01), identical error messages, password containing roll number, login generic errors, lockout after 5, admin namespace, deactivation takes effect on the next call, reset keeps UID, change password, room change keeps UID, role rules, 401/403 on admin routes
+- [x] Browser check (emulators): admin sign-in → import (bad row caught) → issue codes → student activation → feed/profile → student blocked from admin area. Console clean.
+- [ ] Bulk role grants UI (committee leads' extra permissions): API supports `grants`, UI only toggles committee membership. Add with Phase 6 settings if needed.
 
-**Exit (PRD Phase 1):** verified activation, secure login and role checks work end to end. FR-01 and FR-02 pass.
+**Exit (PRD Phase 1):** ✅ verified activation, secure login and role checks work end to end. FR-01 and FR-02 pass. Security review of the custom auth (Launch Blocker 1) still happens in Phase 7.
 
 ---
 
@@ -352,5 +357,7 @@ Email/WhatsApp/SMS, PWA install, maps, staff accounts, multi-hostel, institution
 ## Change log
 
 - 2026-10-21: Plan created from PRD v1.0.
+- 2026-10-22: Phase 2 landed: roster, activation, login, roles, audit, rate limits; admin roster UI. tsx added for scripts.
+- 2026-10-22: Dark mode darkened to blue-black.
 - 2026-10-21: Phase 1 design system landed (radix-ui, lucide-react, clsx). Gallery at `/dev/design`.
 - 2026-10-21: Phase 0 scaffold landed (Next 16.4.2, React 19.3, firebase 13.1, firebase-admin 14.5, zod 4, vitest 5). Emulator tests green.

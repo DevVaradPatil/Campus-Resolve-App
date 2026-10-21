@@ -40,6 +40,7 @@ import {
   FormErrorSummary,
   Input,
   OptionCard,
+  PasswordInput,
   Radio,
   Select,
   Switch,
@@ -252,6 +253,9 @@ export function Gallery() {
                 <option>Block A</option>
                 <option>Block B</option>
               </Select>
+            </Field>
+            <Field label="Password" required hint="At least 10 characters.">
+              <PasswordInput defaultValue="hostel-secret" />
             </Field>
             <Field label="Location details">
               <Input placeholder="e.g. near the stairs" />

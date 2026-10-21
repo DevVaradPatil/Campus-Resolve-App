@@ -38,11 +38,15 @@ If Supabase fallback (D2):
 
 ## App secrets (Phase 2)
 
-Generate each with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`:
-- [ ] `ACTIVATION_CODE_PEPPER`: HMAC key for hashing activation codes
+Not needed for local emulator work, which uses built-in dev values. Required for any real Firebase project.
+Generate each with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` (32+ characters):
+- [ ] `ACTIVATION_CODE_PEPPER`: HMAC key for hashing activation codes. Changing it later invalidates every unused code.
 - [ ] `RATE_LIMIT_IP_SALT`: HMAC key for hashing IPs in rate-limit keys
 - [ ] `CRON_SECRET`: shared secret for the sweep endpoint (also add it as a GitHub Actions secret in Phase 4)
-- [ ] Decide who the **first admin** is, then run `scripts/create-admin` yourself once Claude has written it. Use a password you don't use anywhere else.
+- [ ] Decide who the **first admin** is. For a real project, run this yourself with the real project's env file (Claude never sees the password):
+  `npx tsx --env-file=.env.production.local --conditions=react-server scripts/create-admin.ts <handle> "<Name>"`
+  Use a password you don't use anywhere else. Admins sign in at `/admin/login` with just the handle.
+- [ ] In each real Firebase project: Firestore → **TTL policies** → add a policy on collection `rateLimits`, field `expiresAt`, so old rate-limit counters delete themselves. Check that TTL is available on the Spark plan. If it isn't, tell Claude and the sweep job will prune them instead.
 
 ## Approvals & real-world info (PRD Launch Blockers 4 & 5)
 
