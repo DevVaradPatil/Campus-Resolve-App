@@ -185,11 +185,11 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "firstActionAt",
+          "fieldPath": "escalated",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "escalated",
+          "fieldPath": "firstActionAt",
           "order": "ASCENDING"
         },
         {

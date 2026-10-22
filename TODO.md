@@ -74,7 +74,7 @@ Generate each with `node -e "console.log(require('crypto').randomBytes(32).toStr
 
 - [ ] Generate a `CRON_SECRET` (same command as the other secrets) and add it to **Vercel** env vars, then redeploy
 - [ ] GitHub repo → Settings → Secrets and variables → Actions: add `CRON_SECRET` (same value) and `SWEEP_URL` = `https://campusresolveiitk.vercel.app/api/cron/sweep`. Then Actions → Sweep → **Run workflow** once to check it goes green.
-- [ ] Redeploy the Firestore indexes (Phase 4 added queue/sweep indexes): `npx firebase deploy --only firestore --project dev`. Index builds take a few minutes; until then the queue may error.
+- [x] ~~Redeploy the Firestore indexes~~ (deployed 2026-10-22). Rerun `npx firebase deploy --only firestore --project dev` whenever `firestore.indexes.json` or `firestore.rules` change.
 - [ ] Test complaints made before Phase 4 don't appear in the admin queue. Delete them in the Firebase console (`complaints` and `publicComplaints`) or just make new ones.
 
 ## Phase 7 — Hardening & recovery
