@@ -80,6 +80,7 @@ Generate each with `node -e "console.log(require('crypto').randomBytes(32).toStr
 ## Phase 7 — Hardening & recovery
 
 - [x] Register a **reCAPTCHA v3** site for App Check (free) → `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`, and enable App Check in the Firebase console
+- [ ] **Finish App Check in Firebase:** console → App Check → Apps → the web app → reCAPTCHA v3 → paste the reCAPTCHA **secret** key → Save. The live site currently gets "Firebase App Check API … is disabled" (403), so tokens are missing; the app still works because App Check is in monitor mode. Also make sure `campusresolveiitk.vercel.app` is in the reCAPTCHA key's domain list.
 - [ ] Optional: free **Sentry** account → `SENTRY_DSN` (skip if you'd rather not send error data to a third party)
 - [ ] Install `age` and generate the backup keypair (`age-keygen -o backup.key`). Give Claude **only the public key**. Keep `backup.key` offline (e.g. a password manager or USB), never in the repo. Then take backups weekly as in [docs/RECOVERY.md](docs/RECOVERY.md).
 - [ ] Do one real restore test into `campusresolve-restore-test` following docs/RECOVERY.md, and log it there.
