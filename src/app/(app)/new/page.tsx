@@ -1,6 +1,21 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Lock, Megaphone, Send, TriangleAlert } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Coffee,
+  Droplets,
+  HelpCircle,
+  Leaf,
+  Lock,
+  Megaphone,
+  Send,
+  Tag,
+  TriangleAlert,
+  UtensilsCrossed,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LocationPath, Stepper } from "@/components/issue";
@@ -25,6 +40,16 @@ import {
   type LocationType,
   type Visibility,
 } from "@/lib/domain/complaint";
+
+// Icons for the default categories; admin-added ones fall back to a tag.
+const CATEGORY_ICON: Record<string, LucideIcon> = {
+  mess: UtensilsCrossed,
+  canteen: Coffee,
+  infrastructure: Wrench,
+  "garden-cleanliness": Leaf,
+  "water-utilities": Droplets,
+  other: HelpCircle,
+};
 
 const STEPS = ["Category", "Location", "Details", "Visibility and photos", "Review"];
 const DRAFT_KEY = "cr:new-complaint-draft";
@@ -280,7 +305,7 @@ export default function NewComplaintPage() {
 
           {step === 0 && (
             <>
-              <EmergencyNotice contacts={config.emergencyContacts} />
+              <EmergencyNotice compact contacts={config.emergencyContacts} />
               <fieldset className="flex flex-col gap-2">
                 <legend className="mb-2 font-semibold">Category</legend>
                 {errors.category && (
@@ -294,6 +319,10 @@ export default function NewComplaintPage() {
                       value={c.id}
                       label={c.label}
                       description={c.description}
+                      icon={(() => {
+                        const Icon = CATEGORY_ICON[c.id] ?? Tag;
+                        return <Icon aria-hidden className="size-5" />;
+                      })()}
                       checked={draft.categoryId === c.id}
                       onChange={() => set({ categoryId: c.id, subcategoryId: "" })}
                     />

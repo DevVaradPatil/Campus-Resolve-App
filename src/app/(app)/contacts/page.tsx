@@ -53,7 +53,7 @@ export default function ContactsPage() {
       {contacts && (
         <EmergencyNotice contacts={emergency.map((c) => ({ label: c.name, phone: c.phone }))} />
       )}
-      <Field label="Search contacts">
+      <Field label="Search contacts" quiet>
         <Input
           type="search"
           value={q}

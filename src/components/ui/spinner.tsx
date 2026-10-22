@@ -8,7 +8,8 @@ export function Spinner({ className, label }: { className?: string; label?: stri
       role={label ? "status" : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
-      className={clsx("size-5 animate-spin", className)}
+      data-essential-motion
+      className={clsx("size-5 animate-[spin_1.1s_linear_infinite]", className)}
     >
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeOpacity="0.25" strokeWidth="3" />
       <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />

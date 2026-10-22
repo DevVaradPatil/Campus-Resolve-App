@@ -9,10 +9,13 @@ import {
   StatTile,
   hoursLabel,
 } from "@/components/stats";
+import { Sparkline, TrendChart } from "@/components/charts";
 import { ServiceUnavailable } from "@/components/ui/feedback";
 import { Skeleton } from "@/components/ui/spinner";
 import { DataTable, Panel } from "@/components/ui/surface";
 import { api } from "@/lib/client/api";
+import { RESOLUTION_BUCKETS } from "@/lib/domain/analytics";
+import { PRIORITIES, type Priority } from "@/lib/domain/complaint";
 import type { DashboardData } from "@/lib/server/dashboard";
 
 export function useDashboard(days: number) {
@@ -52,25 +55,33 @@ export function HostelStats({ d }: { d: DashboardData }) {
   const prev = d.staff?.previous ?? d.committee?.previous;
   const rows = (m: Record<string, number>, labels: Record<string, string>) =>
     Object.entries(m).map(([key, value]) => ({ key, label: labels[key] ?? key, value }));
+  const daily = d.daily;
+  // 7-point smoothing keeps the tile sparklines readable over 30–90 days.
+  const smooth = (xs: number[]) =>
+    xs.length > 14
+      ? xs.map((_, i) => xs.slice(Math.max(0, i - 6), i + 1).reduce((a, b) => a + b, 0))
+      : xs;
+  const delta = prev ? h.created - prev.created : null;
   return (
     <>
       <Grid>
         <StatTile
           label="Complaints reported"
           value={String(h.created)}
+          spark={<Sparkline values={smooth(daily.map((x) => x.created))} />}
           change={
-            prev
-              ? {
-                  text: `${h.created - prev.created >= 0 ? "+" : "−"}${Math.abs(h.created - prev.created)}`,
-                  direction:
-                    h.created > prev.created ? "up" : h.created < prev.created ? "down" : "same",
+            delta === null
+              ? null
+              : {
+                  text: `${delta >= 0 ? "+" : "−"}${Math.abs(delta)}`,
+                  direction: delta > 0 ? "up" : delta < 0 ? "down" : "same",
                 }
-              : null
           }
         />
         <RateTile
-          label="Resolved"
-          of="resolved so far"
+          label="Resolved so far"
+          of="resolved"
+          spark={<Sparkline values={smooth(daily.map((x) => x.resolved))} />}
           now={{
             part: h.resolutionRate.resolved,
             whole: h.resolutionRate.eligible,
@@ -90,34 +101,92 @@ export function HostelStats({ d }: { d: DashboardData }) {
           detail={
             h.resolutionHours.count
               ? `Median of ${h.resolutionHours.count}; average ${hoursLabel(h.resolutionHours.average)}`
-              : "No resolutions in this period"
+              : "No resolutions yet"
           }
         />
       </Grid>
+
+      <Panel title="Reported and resolved, day by day">
+        <div className="px-4 pb-4">
+          <TrendChart data={daily} />
+        </div>
+      </Panel>
+
       <div className="grid gap-4 md:grid-cols-2">
-        <Panel title="By category">
+        <Panel title="What residents report">
           <div className="px-4 pb-4">
             <BarList
+              share
               label="Complaints by category"
               rows={rows(h.byCategory, d.labels.categories)}
             />
           </div>
         </Panel>
-        <Panel title="By block">
+        <Panel title="How long fixes take">
+          <div className="flex flex-col gap-3 px-4 pb-4">
+            <BarList
+              ordered
+              label="Time from report to resolution"
+              rows={RESOLUTION_BUCKETS.map((b, i) => ({
+                key: b.label,
+                label: b.label,
+                value: h.resolutionHours.buckets[i],
+              }))}
+              empty="Nothing was resolved in this period."
+            />
+            <p className="text-xs text-muted">From the report to the recorded fix.</p>
+          </div>
+        </Panel>
+        <Panel title="Where">
           <div className="px-4 pb-4">
-            <BarList label="Complaints by block" rows={rows(h.byBlock, d.labels.blocks)} />
+            <BarList share label="Complaints by block" rows={rows(h.byBlock, d.labels.blocks)} />
+          </div>
+        </Panel>
+        <Panel title="How urgent">
+          <div className="flex flex-col gap-3 px-4 pb-4">
+            <BarList
+              ordered
+              share
+              label="Complaints by priority"
+              rows={PRIORITIES.map((p) => ({
+                key: p,
+                label: PRIORITY_LABEL[p],
+                value: h.byPriority[p] ?? 0,
+              }))}
+            />
+            <p className="text-xs text-muted">
+              Set by category rules, not by how loudly it was reported.
+            </p>
           </div>
         </Panel>
       </div>
-      <p className="text-sm text-muted">
-        <RangeLabel range={d.range} />. Resolved counts complaints reported in this period that are
-        resolved now; merged duplicates are left out ({h.recurringRate.duplicates} this period).
-        Response targets are pilot targets, not promises from hostel staff. Counts include
-        confidential complaints, which are never shown individually.
-      </p>
+
+      <details className="rounded-surface border border-rule bg-sheet px-4 py-3 text-sm">
+        <summary className="min-h-11 cursor-pointer content-center font-semibold">
+          About these numbers · <RangeLabel range={d.range} />
+        </summary>
+        <ul className="mt-2 flex list-disc flex-col gap-1 pl-5 text-muted">
+          <li>
+            &ldquo;Resolved so far&rdquo; counts complaints reported in this period that are
+            resolved now. Merged duplicates are left out ({h.recurringRate.duplicates} this period).
+          </li>
+          <li>
+            Response targets are pilot targets (1 h critical, 8 h high, 2 days normal, 5 days low),
+            not promises from hostel staff.
+          </li>
+          <li>Counts include confidential complaints, which are never shown individually.</li>
+        </ul>
+      </details>
     </>
   );
 }
+
+const PRIORITY_LABEL: Record<Priority, string> = {
+  critical: "Critical",
+  high: "High",
+  normal: "Normal",
+  low: "Low",
+};
 
 const CLOSED = {
   student_confirmed: "Confirmed fixed by reporter",

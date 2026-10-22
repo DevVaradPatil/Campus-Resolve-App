@@ -94,6 +94,12 @@ export async function dashboard(user: SessionUser, days: number) {
   };
   const base = {
     range: { from: range.from, to: range.to, days },
+    /** Per-day counts for the trend chart, oldest first. */
+    daily: range.current.map((day, i) => ({
+      day,
+      created: cur[i].created ?? 0,
+      resolved: cur[i].resolved ?? 0,
+    })),
     hostel: publicSummary(s),
     mine: my,
     labels,

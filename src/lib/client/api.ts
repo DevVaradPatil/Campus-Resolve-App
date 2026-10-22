@@ -1,11 +1,19 @@
 import { getToken } from "firebase/app-check";
+import { signOut } from "firebase/auth";
 import { appCheck, auth } from "./firebase";
 
 /** Session token, plus the App Check token when App Check is on. A failed App Check fetch just
  * leaves the header off; the server decides whether that matters (monitor vs enforce). */
 async function authHeaders(): Promise<Record<string, string>> {
   const [token, check] = await Promise.all([
-    auth.currentUser?.getIdToken(),
+    // A session that can't refresh (revoked by a password reset, or expired) is dropped here, so
+    // it can't block the request, including signing in again.
+    auth.currentUser?.getIdToken().catch(() =>
+      signOut(auth).then(
+        () => undefined,
+        () => undefined,
+      ),
+    ),
     appCheck
       ? getToken(appCheck).then(
           (r) => r.token,

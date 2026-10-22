@@ -29,6 +29,9 @@
   --warning-soft: #fff1cc;
   --info: #2433a6;
   --info-soft: #e8ebfa;
+  /* Chart series (validated pair, dataviz palette slots 1-2): identity, never status */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
 
   /* Status: fg on soft bg */
   --st-submitted: #424a5a;
@@ -74,6 +77,8 @@
     --warning-soft: #2e2410;
     --info: #b4c0ff;
     --info-soft: #1a2140;
+    --series-1: #3987e5;
+    --series-2: #d95926;
 
     --st-submitted: #c3c9d6;
     --st-submitted-bg: #1e2333;
@@ -106,6 +111,8 @@
   --color-text: var(--text);
   --color-muted: var(--muted);
   --color-ink: var(--ink);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
   --color-ink-hover: var(--ink-hover);
   --color-ink-soft: var(--ink-soft);
   --color-on-ink: var(--on-ink);
@@ -196,12 +203,19 @@
     color: var(--on-highlight);
   }
 
+  /* Reduced motion: decorative animations run once and stop. Shortening a looping animation
+     to 1ms without stopping it made spinners and skeletons flicker at ~1000 cycles a second. */
   @media (prefers-reduced-motion: reduce) {
-    *,
+    *:not([data-essential-motion]),
     *::before,
     *::after {
       animation-duration: 1ms !important;
+      animation-iteration-count: 1 !important;
       transition-duration: 1ms !important;
+    }
+    /* A loading spinner is feedback, not decoration: it keeps turning, slowly. */
+    [data-essential-motion] {
+      animation-duration: 2.4s !important;
     }
   }
 }

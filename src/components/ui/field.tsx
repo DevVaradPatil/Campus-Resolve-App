@@ -24,6 +24,7 @@ export function Field({
   hint,
   error,
   required,
+  quiet,
   children,
   className,
 }: {
@@ -31,6 +32,8 @@ export function Field({
   hint?: ReactNode;
   error?: string;
   required?: boolean;
+  /** Filters and search boxes: don't mark the field "(optional)". */
+  quiet?: boolean;
   children: ReactNode;
   className?: string;
 }) {
@@ -42,7 +45,7 @@ export function Field({
     <div className={clsx("flex flex-col gap-1.5", className)}>
       <label htmlFor={id} className="font-semibold">
         {label}
-        {!required && <span className="font-normal text-muted"> (optional)</span>}
+        {!required && !quiet && <span className="font-normal text-muted"> (optional)</span>}
       </label>
       {hint && (
         <p id={hintId} className="text-sm text-muted">

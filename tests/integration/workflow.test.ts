@@ -778,8 +778,13 @@ describe("CSV export (FR-15)", () => {
 
 describe("retention (PRD §14.2)", () => {
   const DAY = 86_400_000;
-  async function closedComplaint(daysAgo: number, extra: Record<string, unknown> = {}) {
+  async function closedComplaint(
+    daysAgo: number,
+    extra: Record<string, unknown> = {},
+    whileOpen?: (id: string) => Promise<void>,
+  ) {
     const id = await create(alice);
+    await whileOpen?.(id);
     await act(adminToken, id, { type: "assign", contactId: "maintenance" });
     await act(adminToken, id, { type: "resolve", note: "Fixed it" });
     await act(alice, id, { type: "confirm" });
@@ -796,19 +801,20 @@ describe("retention (PRD §14.2)", () => {
   });
 
   it("deletes year-old closed complaints with everything attached, and keeps the rest", async () => {
-    const old = await closedComplaint(400);
-    const recent = await closedComplaint(30);
-    const held = await closedComplaint(400, { retentionHold: true });
-    // Things hanging off the old complaint.
+    // A photo hanging off the old complaint, added while it was open.
     const img = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#888" } })
       .jpeg()
       .toBuffer();
-    const form = new FormData();
-    form.append("photo", new File([new Uint8Array(img)], "p.jpg", { type: "image/jpeg" }));
-    await photoRoute(
-      await authedRequest(alice, "http://localhost/api/x", { method: "POST", body: form }),
-      { params: Promise.resolve({ id: old }) },
-    );
+    const old = await closedComplaint(400, {}, async (id) => {
+      const form = new FormData();
+      form.append("photo", new File([new Uint8Array(img)], "p.jpg", { type: "image/jpeg" }));
+      await photoRoute(
+        await authedRequest(alice, "http://localhost/api/x", { method: "POST", body: form }),
+        { params: Promise.resolve({ id }) },
+      );
+    });
+    const recent = await closedComplaint(30);
+    const held = await closedComplaint(400, { retentionHold: true });
     const key = (await adminDb.collection(`complaints/${old}/attachments`).get()).docs[0].get(
       "key",
     );
@@ -947,5 +953,24 @@ describe("backup and restore (FR-16)", () => {
     rmSync(path.join(process.cwd(), ".data", "uploads", ...backup.attachments[0].key.split("/")));
     await resetEmulators();
     expect((await restoreBackup(opened)).missingAttachments).toEqual([backup.attachments[0].key]);
+  });
+});
+
+describe("photos after resolution", () => {
+  it("are refused once the complaint is resolved", async () => {
+    const id = await create(alice);
+    await act(adminToken, id, { type: "assign", contactId: "maintenance" });
+    await act(adminToken, id, { type: "resolve", note: "Fixed it" });
+    const img = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#888" } })
+      .jpeg()
+      .toBuffer();
+    const form = new FormData();
+    form.append("photo", new File([new Uint8Array(img)], "p.jpg", { type: "image/jpeg" }));
+    const res = await photoRoute(
+      await authedRequest(alice, "http://localhost/api/x", { method: "POST", body: form }),
+      { params: Promise.resolve({ id }) },
+    );
+    expect(res.status).toBe(409);
+    expect((await view(alice, id)).canAddPhotos).toBe(false);
   });
 });

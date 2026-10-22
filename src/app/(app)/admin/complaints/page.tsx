@@ -83,7 +83,7 @@ export default function QueuePage() {
 
   const set = (k: keyof typeof FILTERS) => (v: string) => setFilters((f) => ({ ...f, [k]: v }));
   const select = (k: keyof typeof FILTERS, label: string, options: string[][]) => (
-    <Field label={label}>
+    <Field label={label} quiet>
       <Select value={filters[k]} onChange={(e) => set(k)(e.target.value)}>
         <option value="">Any</option>
         {options.map(([v, l]) => (

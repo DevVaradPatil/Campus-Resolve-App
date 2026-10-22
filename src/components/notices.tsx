@@ -22,7 +22,42 @@ export function PilotNotice() {
 export type EmergencyContact = { label: string; phone: string };
 
 /** A ticket is not emergency help (PRD §6.2). Shown on the form and on urgent issues. */
-export function EmergencyNotice({ contacts }: { contacts: EmergencyContact[] }) {
+export function EmergencyNotice({
+  contacts,
+  compact,
+}: {
+  contacts: EmergencyContact[];
+  /** One short block for forms: the numbers as tap-to-call chips. */
+  compact?: boolean;
+}) {
+  if (compact)
+    return (
+      <div
+        role="note"
+        className="flex flex-col gap-2 rounded-control border border-danger/40 bg-danger-soft px-3 py-2.5 text-sm"
+      >
+        <p className="flex items-center gap-2 font-semibold">
+          <Phone aria-hidden className="size-4 shrink-0 text-danger" />
+          Emergency? Call now. A complaint may not be seen for hours.
+        </p>
+        {contacts.length ? (
+          <ul className="flex flex-wrap gap-2">
+            {contacts.map((c) => (
+              <li key={c.label}>
+                <a
+                  href={`tel:${c.phone.replace(/\s/g, "")}`}
+                  className="inline-flex min-h-11 items-center rounded-full border border-danger/40 bg-sheet px-3 font-semibold text-danger"
+                >
+                  {c.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>Call campus security or the health centre directly.</p>
+        )}
+      </div>
+    );
   return (
     <Banner tone="danger" icon={Phone} title="In an emergency, call. Don't file a complaint.">
       <p>Nobody may see a complaint for hours.</p>

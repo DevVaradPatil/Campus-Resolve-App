@@ -219,13 +219,13 @@ export default function ComplaintPage() {
         </Panel>
       )}
 
-      <Comments c={c} />
-
       <Panel title="History">
         <div className="px-4 pb-5">
           <StatusTimeline events={c.timeline} />
         </div>
       </Panel>
+
+      <Comments c={c} />
     </article>
   );
 }

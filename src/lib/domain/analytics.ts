@@ -24,6 +24,16 @@ function addMaps(docs: StatsDoc[], pick: (d: StatsDoc) => Record<string, number>
   return out;
 }
 
+/** Resolution-time histogram bins, in hours from submission. */
+export const RESOLUTION_BUCKETS = [
+  { label: "Under a day", max: 24 },
+  { label: "1–2 days", max: 48 },
+  { label: "2–3 days", max: 72 },
+  { label: "3–5 days", max: 120 },
+  { label: "5–7 days", max: 168 },
+  { label: "Over a week", max: Infinity },
+] as const;
+
 export function median(xs: number[]) {
   if (!xs.length) return null;
   const s = [...xs].sort((a, b) => a - b);
@@ -62,6 +72,10 @@ export function summarize(docs: StatsDoc[]) {
       count: hours.length,
       median: median(hours),
       average: hours.length ? sum(hours) / hours.length : null,
+      buckets: RESOLUTION_BUCKETS.map(
+        (b, i) =>
+          hours.filter((h) => h < b.max && (i === 0 || h >= RESOLUTION_BUCKETS[i - 1].max)).length,
+      ),
     },
     /** Linked duplicates relative to all complaints in the period. */
     recurringRate: { duplicates, created, rate: rate(duplicates, created) },
@@ -90,4 +104,6 @@ export const publicSummary = (s: Summary) => ({
   recurringRate: s.recurringRate,
   byCategory: s.byCategory,
   byBlock: s.byBlock,
+  byPriority: s.byPriority,
+  closed: s.closed,
 });

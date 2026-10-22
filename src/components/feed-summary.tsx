@@ -19,6 +19,9 @@ import { api } from "@/lib/client/api";
 import { db } from "@/lib/client/firebase";
 import type { IssueSummary, PublicComplaint } from "@/lib/domain/complaint";
 
+const chip =
+  "inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-rule bg-sheet px-4 font-semibold text-ink hover:bg-ink-soft";
+
 type Mine = {
   submitted: number;
   inProgress: number;
@@ -80,12 +83,12 @@ export function FeedSummary() {
   const open = mine ? mine.submitted + mine.inProgress + mine.reopened : 0;
   return (
     <>
-      <nav aria-label="Shortcuts" className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+      <nav
+        aria-label="Shortcuts"
+        className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 text-sm [scrollbar-width:none] md:mx-0 md:px-0"
+      >
         {mine && (open > 0 || mine.awaitingConfirmation > 0) && (
-          <Link
-            href="/mine"
-            className="inline-flex min-h-11 items-center gap-1 underline underline-offset-2"
-          >
+          <Link href="/mine" className={chip}>
             {mine.awaitingConfirmation > 0 ? (
               <Highlight>
                 {mine.awaitingConfirmation} of yours{" "}
@@ -96,17 +99,11 @@ export function FeedSummary() {
             )}
           </Link>
         )}
-        <Link
-          href="/stats"
-          className="inline-flex min-h-11 items-center gap-1.5 text-ink underline underline-offset-2"
-        >
+        <Link href="/stats" className={chip}>
           <BarChart3 aria-hidden className="size-4" />
           Hostel stats
         </Link>
-        <Link
-          href="/contacts"
-          className="inline-flex min-h-11 items-center gap-1.5 text-ink underline underline-offset-2"
-        >
+        <Link href="/contacts" className={chip}>
           <Phone aria-hidden className="size-4" />
           Contacts
         </Link>

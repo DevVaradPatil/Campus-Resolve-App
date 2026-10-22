@@ -36,8 +36,8 @@ const PAGE = 20; // firestore.rules rejects bigger pages
 // can merge the per-field indexes instead of needing one per combination.
 const TABS = {
   trending: { label: "Trending", open: true, order: ["supportCount", "createdAt"] },
-  unresolved: { label: "Unresolved", open: true, order: ["createdAt"] },
-  resolved: { label: "Recently resolved", open: false, order: ["updatedAt"] },
+  unresolved: { label: "Open", open: true, order: ["createdAt"] },
+  resolved: { label: "Resolved", open: false, order: ["updatedAt"] },
   supported: { label: "Most supported", open: undefined, order: ["supportCount", "createdAt"] },
 } as const;
 type Tab = keyof typeof TABS;
@@ -172,7 +172,7 @@ export default function FeedPage() {
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold">Hostel feed</h1>
         {state.status === "signedIn" && (
-          <p className="flex flex-wrap items-center gap-x-2 text-muted">
+          <p className="flex flex-wrap items-center gap-x-2 text-sm text-muted">
             You appear to other residents as <Pseudonym alias={state.me.pseudonym} />
           </p>
         )}
@@ -187,7 +187,7 @@ export default function FeedPage() {
           setTerm(search.trim());
         }}
       >
-        <Field label="Search titles" className="flex-1">
+        <Field label="Search titles" quiet className="flex-1">
           <Input
             type="search"
             value={search}
@@ -234,7 +234,7 @@ export default function FeedPage() {
               />
             </div>
             <div className="grid grid-cols-2 gap-3 px-4 pt-4">
-              <Field label="Category">
+              <Field label="Category" quiet>
                 <Select value={category} onChange={(e) => setCategory(e.target.value)}>
                   <option value="">All categories</option>
                   {config?.categories.map((c) => (
@@ -244,7 +244,7 @@ export default function FeedPage() {
                   ))}
                 </Select>
               </Field>
-              <Field label="Block">
+              <Field label="Block" quiet>
                 <Select value={block} onChange={(e) => setBlock(e.target.value)}>
                   <option value="">All blocks</option>
                   {config?.blocks.map((b) => (

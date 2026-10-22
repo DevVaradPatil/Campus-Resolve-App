@@ -4,7 +4,7 @@ import { EyeOff, Flag, MessageSquare, ThumbsUp } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Pseudonym, Tag } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Banner, EmptyState } from "@/components/ui/feedback";
+import { Banner } from "@/components/ui/feedback";
 import { Field, Input, Radio, Textarea } from "@/components/ui/field";
 import { Dialog, DialogContent } from "@/components/ui/overlay";
 import { Skeleton } from "@/components/ui/spinner";
@@ -94,11 +94,12 @@ export function Comments({ c }: { c: ComplaintView }) {
         {failed && <Banner tone="warning" title="Comments couldn't load. Reload to try again." />}
         {!page && !failed && <Skeleton className="h-16" />}
         {page && page.comments.length === 0 && (
-          <EmptyState icon={MessageSquare} title="No comments yet">
+          <p className="flex items-center gap-2 text-sm text-muted">
+            <MessageSquare aria-hidden className="size-4 shrink-0" />
             {confidential
-              ? "Add anything the admin should know."
-              : "Seen this too? Add what you noticed."}
-          </EmptyState>
+              ? "No messages yet. Add anything the admin should know."
+              : "No comments yet. Seen this too? Add what you noticed."}
+          </p>
         )}
         {page && page.comments.length > 0 && (
           <div className="-mx-4 border-y border-rule">
@@ -165,7 +166,7 @@ export function Comments({ c }: { c: ComplaintView }) {
             setPosting(false);
           }}
         >
-          <Field label="Add a comment" error={error}>
+          <Field label="Add a comment" quiet error={error}>
             <Textarea
               value={body}
               maxLength={COMMENT_MAX}

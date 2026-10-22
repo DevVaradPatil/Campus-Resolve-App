@@ -113,7 +113,9 @@ describe("stats and analytics (FR-14, fixed fixture)", () => {
   });
 
   it("gives median and average resolution time from submission", () => {
-    expect(s.resolutionHours).toEqual({ count: 2, median: 40, average: 40 });
+    expect(s.resolutionHours).toMatchObject({ count: 2, median: 40, average: 40 });
+    // 10 h → "Under a day", 70 h → "2–3 days"
+    expect(s.resolutionHours.buckets).toEqual([1, 0, 1, 0, 0, 0]);
   });
 
   it("computes the recurring-issue rate from linked duplicates", () => {
@@ -131,6 +133,7 @@ describe("stats and analytics (FR-14, fixed fixture)", () => {
     const pub = publicSummary(s);
     expect(Object.keys(pub)).not.toContain("workload");
     expect(Object.keys(pub)).not.toContain("feedback");
+    expect(Object.keys(pub)).not.toContain("escalations");
   });
 
   it("puts cohort counters on the creation day, events on the day they happen", () => {

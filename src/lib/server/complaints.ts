@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import {
   firstActionDeadline,
+  isOpen,
   LIMITS as FIELD_LIMITS,
   priorityFor,
   routeComplaint,
@@ -282,7 +283,7 @@ export async function getComplaint(user: SessionUser, id: string): Promise<Compl
         }
       : null,
     photos,
-    canAddPhotos: viewer === "owner" && c.attachmentCount < FIELD_LIMITS.photos,
+    canAddPhotos: viewer === "owner" && isOpen(c.status) && c.attachmentCount < FIELD_LIMITS.photos,
     timeline: events.docs
       .filter((d) => staff || !(d.data() as EventDoc).internal)
       .map((d) => {
@@ -377,6 +378,8 @@ export async function addPhoto(user: SessionUser, id: string, file: File) {
   if (!c || c.reporterUid !== user.uid) throw notFound();
   const tooMany = () =>
     new HttpError(400, `A complaint can have at most ${FIELD_LIMITS.photos} photos.`);
+  if (!isOpen(c.status))
+    throw new HttpError(409, "Photos can be added while the complaint is open.");
   if (c.attachmentCount >= FIELD_LIMITS.photos) throw tooMany();
   if (file.size > FIELD_LIMITS.photoMb * MB)
     throw new HttpError(413, `Each photo must be ${FIELD_LIMITS.photoMb} MB or smaller.`);

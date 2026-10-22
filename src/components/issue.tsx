@@ -65,13 +65,15 @@ export function IssueRow({
           <TicketId id={issue.ticketId} />
           <span>{issue.category}</span>
           <time dateTime={issue.createdAt}>{formatDateTime(issue.createdAt)}</time>
-          <span className="inline-flex items-center gap-1 tabular-nums">
-            <ThumbsUp aria-hidden className="size-3.5" />
-            {issue.supportCount}
-            <span className="sr-only">
-              {issue.supportCount === 1 ? "resident" : "residents"} affected
+          {issue.supportCount > 0 && (
+            <span className="inline-flex items-center gap-1 tabular-nums">
+              <ThumbsUp aria-hidden className="size-3.5" />
+              {issue.supportCount}
+              <span className="sr-only">
+                {issue.supportCount === 1 ? "resident" : "residents"} affected
+              </span>
             </span>
-          </span>
+          )}
         </p>
       </div>
       {issue.thumbUrl && (

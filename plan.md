@@ -383,6 +383,7 @@ Email/WhatsApp/SMS, PWA install, maps, staff accounts, multi-hostel, institution
 ## Change log
 
 - 2026-10-21: Plan created from PRD v1.0.
+- 2026-10-22: UI pass: reduced-motion loader fix, stats page charts (daily trend, sparklines, distributions), feed/form/detail tidy-ups, stale-session sign-in fix.
 - 2026-10-22: App Check (monitor by default), sweep storage health check, docs/LAUNCH.md.
 - 2026-10-22: Phase 7: security headers (static CSP), CI audit + secret scan, retention (off until approved), encrypted backup/restore with FR-16 test, about/privacy/rules pages, ops and recovery docs, axe pass.
 - 2026-10-22: Phase 6 landed: daily stats counters, §7.4 analytics, role-shaped dashboards, contact directory, CSV export.
