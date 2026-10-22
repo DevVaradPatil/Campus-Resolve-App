@@ -27,6 +27,7 @@ import { reencodeImage } from "./images";
 import { consume, LIMITS } from "./rate-limit";
 import { deleteObject, putObject, signedUrl } from "./storage";
 import { adminUids, writeNotifications } from "./notify";
+import { canSupport } from "./community";
 import { availableActions } from "./workflow";
 import type { AttachmentDoc, ComplaintDoc, EventDoc } from "./types";
 
@@ -208,6 +209,8 @@ export type ComplaintView = {
   actions: WorkflowInput["type"][];
   /** Staff only: who it can be assigned to. */
   assignees: { id: string; name: string }[];
+  /** "Affects me too" state for this viewer. */
+  support: { supported: boolean; canSupport: boolean };
 };
 
 export const iso = (t: Timestamp | null | undefined) =>
@@ -221,10 +224,11 @@ export async function getComplaint(user: SessionUser, id: string): Promise<Compl
   const privileged = viewer !== "public";
 
   const staff = viewer === "staff";
-  const [events, attachments, cfg] = await Promise.all([
+  const [events, attachments, cfg, vote] = await Promise.all([
     ref.collection("events").orderBy("at").get(),
     ref.collection("attachments").orderBy("createdAt").get(),
     staff || c.assignedContactId ? loadConfig() : null,
+    ref.collection("votes").doc(user.uid).get(),
   ]);
   const contacts = cfg?.contacts ?? [];
   const visible = attachments.docs.filter((d) => {
@@ -310,6 +314,7 @@ export async function getComplaint(user: SessionUser, id: string): Promise<Compl
     assignees: staff
       ? contacts.filter((x) => x.active).map((x) => ({ id: x.id, name: x.name }))
       : [],
+    support: { supported: vote.exists, canSupport: canSupport(user, c) },
   };
 }
 

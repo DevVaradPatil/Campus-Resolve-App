@@ -197,3 +197,9 @@ export const markReadInput = z.union([
 ]);
 
 export const preferencesInput = z.object({ muteNonEssential: z.boolean() });
+
+export const COMMENT_MAX = 1000;
+export const commentInput = z.object({
+  body: z.string().trim().min(2, "Write a little more.").max(COMMENT_MAX),
+});
+export const hideCommentInput = z.object({ reason });

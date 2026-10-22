@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { GET as queueRoute } from "@/app/api/admin/complaints/route";
 import { GET as committeeRoute } from "@/app/api/committee/complaints/route";
 import { POST as actionRoute } from "@/app/api/complaints/[id]/actions/route";
+import { POST as hideCommentRoute } from "@/app/api/complaints/[id]/comments/[commentId]/hide/route";
+import { GET as commentsGet, POST as commentsPost } from "@/app/api/complaints/[id]/comments/route";
+import { POST as supportRoute } from "@/app/api/complaints/[id]/support/route";
 import { GET as reporterRoute } from "@/app/api/complaints/[id]/reporter/route";
 import { GET as viewRoute } from "@/app/api/complaints/[id]/route";
 import { POST as createRoute } from "@/app/api/complaints/route";
@@ -415,5 +418,105 @@ describe("notifications (FR-13)", () => {
       (await adminDb.doc(`users/${await uidOf("231001")}`).get()).get("muteNonEssential"),
     ).toBe(true);
     expect(await audits()).toContain("account.preferences");
+  });
+});
+
+describe("support (FR-09)", () => {
+  const support = async (token: string, id: string) => {
+    const res = await supportRoute(
+      await authedRequest(token, "http://localhost/api/x", { method: "POST" }),
+      { params: Promise.resolve({ id }) },
+    );
+    return { status: res.status, body: await res.json() };
+  };
+
+  it("allows one active vote per account and keeps both counts in step", async () => {
+    const id = await create(alice);
+    expect((await support(bob, id)).body).toEqual({ supported: true, supportCount: 1 });
+    expect((await support(committee, id)).body).toEqual({ supported: true, supportCount: 2 });
+    expect((await support(bob, id)).body).toEqual({ supported: false, supportCount: 1 });
+    expect((await doc(id)).supportCount).toBe(1);
+    expect((await pub(id))?.supportCount).toBe(1);
+    expect((await adminDb.collection(`complaints/${id}/votes`).get()).size).toBe(1);
+  });
+
+  it("refuses the reporter, confidential complaints and spam", async () => {
+    const id = await create(alice);
+    expect((await support(alice, id)).status).toBe(409);
+    const secret = await create(alice, { visibility: "confidential" });
+    expect((await support(bob, secret)).status).toBe(404);
+    for (let i = 0; i < 30; i++) await support(bob, id);
+    expect((await support(bob, id)).status).toBe(429);
+  });
+});
+
+describe("comments (FR-10)", () => {
+  const comment = async (token: string, id: string, body: string) =>
+    (
+      await commentsPost(
+        await authedRequest(token, "http://localhost/api/x", {
+          method: "POST",
+          body: JSON.stringify({ body }),
+        }),
+        { params: Promise.resolve({ id }) },
+      )
+    ).status;
+  const list = async (token: string, id: string) =>
+    (await commentsGet(await authedRequest(token), { params: Promise.resolve({ id }) })).json();
+
+  it("posts plain text under a pseudonym, notifies the reporter, and never audits the text", async () => {
+    const id = await create(alice);
+    expect(await comment(bob, id, "Same in my wing <script>alert(1)</script>")).toBe(200);
+    const { comments } = await list(alice, id);
+    expect(comments).toHaveLength(1);
+    expect(comments[0].author).toMatch(/^\w+ \w+$/); // pseudonym, not "Ravi Kumar"
+    expect(comments[0].body).toContain("<script>"); // stored as text; React escapes it
+    const notes = (await adminDb.collection("notifications").get()).docs.map((d) => d.data());
+    expect(notes.some((n) => n.type === "comment")).toBe(true);
+    const audit = (await adminDb.collection("auditLogs").get()).docs.find(
+      (d) => d.get("action") === "comment.create",
+    );
+    expect(JSON.stringify(audit?.data())).not.toContain("wing");
+  });
+
+  it("validates length and rate-limits to 10 per 10 minutes", async () => {
+    const id = await create(alice);
+    expect(await comment(bob, id, "x".repeat(1001))).toBe(400);
+    for (let i = 0; i < 10; i++) expect(await comment(bob, id, `comment ${i}`)).toBe(200);
+    expect(await comment(bob, id, "one too many")).toBe(429);
+  });
+
+  it("lets moderators hide a comment with a reason; others stop seeing it", async () => {
+    const id = await create(alice);
+    await comment(bob, id, "Names someone in room 215");
+    const [m] = (await list(alice, id)).comments;
+    const hide = async (token: string) =>
+      (
+        await hideCommentRoute(
+          await authedRequest(token, "http://localhost/api/x", {
+            method: "POST",
+            body: JSON.stringify({ reason: "Names a resident" }),
+          }),
+          { params: Promise.resolve({ id, commentId: m.id }) },
+        )
+      ).status;
+    expect(await hide(alice)).toBe(403);
+    expect(await hide(committee)).toBe(200);
+    expect((await list(alice, id)).comments).toHaveLength(0);
+    expect((await list(committee, id)).comments[0].hidden).toEqual({ reason: "Names a resident" });
+    expect(await audits()).toContain("comment.hide");
+  });
+
+  it("keeps confidential threads between the reporter and admins", async () => {
+    const id = await create(alice, { visibility: "confidential" });
+    expect(await comment(bob, id, "Can I see this?")).toBe(404);
+    expect(await comment(alice, id, "More detail for the admin")).toBe(200);
+    expect((await list(adminToken, id)).comments).toHaveLength(1);
+    const toAdmin = (
+      await adminDb.collection("notifications").where("recipientUid", "==", admin.uid).get()
+    ).docs
+      .map((d) => d.data())
+      .find((n) => n.type === "comment");
+    expect(toAdmin?.body).toBeNull();
   });
 });

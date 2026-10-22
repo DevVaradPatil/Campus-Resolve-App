@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ComplaintActions } from "@/components/complaint-actions";
+import { Comments, SupportButton } from "@/components/complaint-community";
 import { LocationPath, StatusTimeline } from "@/components/issue";
 import { EmergencyNotice, PublicPhotoNotice } from "@/components/notices";
 import { EscalatedBadge, PriorityBadge, StatusBadge, Tag, TicketId } from "@/components/ui/badge";
@@ -114,6 +115,7 @@ export default function ComplaintPage() {
           </span>
         </p>
         <LocationPath parts={c.location} />
+        <SupportButton c={c} />
         {c.workflow.assignee && (
           <p className="text-sm">
             Assigned to <span className="font-semibold">{c.workflow.assignee}</span>
@@ -189,6 +191,8 @@ export default function ComplaintPage() {
           </div>
         </Panel>
       )}
+
+      <Comments c={c} />
 
       <Panel title="History">
         <div className="px-4 pb-5">

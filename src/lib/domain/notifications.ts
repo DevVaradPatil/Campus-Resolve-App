@@ -27,7 +27,8 @@ const RULES: Partial<Record<NotificationType, { to: Who[]; title: string; essent
   escalated: { to: ["reporter", "admins"], title: "{t} was escalated", essential: true },
   hidden: { to: ["reporter"], title: "{t} was hidden from the feed", essential: true },
   closure_reminder: { to: ["reporter"], title: "{t} closes soon", essential: true },
-  comment: { to: ["reporter"], title: "New comment on {t}", essential: false },
+  // Admins are only passed in for confidential complaints (the reporter's private thread).
+  comment: { to: ["reporter", "admins"], title: "New comment on {t}", essential: false },
 };
 
 /**

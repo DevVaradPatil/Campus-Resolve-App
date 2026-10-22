@@ -13,6 +13,8 @@ export const LIMITS = {
   passwordChange: { limit: 3, windowSec: 60 * 60 },
   complaintCreate: { limit: 5, windowSec: 60 * 60 },
   upload: { limit: 10, windowSec: 60 * 60 },
+  support: { limit: 30, windowSec: 10 * 60 },
+  comment: { limit: 10, windowSec: 10 * 60 },
 } as const;
 
 type Limit = { limit: number; windowSec: number };

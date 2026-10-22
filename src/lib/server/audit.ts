@@ -20,6 +20,9 @@ export type AuditAction =
   | "config.seed"
   | "config.update"
   | "complaint.create"
+  | "complaint.support"
+  | "comment.create"
+  | "comment.hide"
   | `complaint.${WorkflowInput["type"] | "auto_close" | "reporter_view"}`
   | "attachment.upload";
 

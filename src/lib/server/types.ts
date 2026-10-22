@@ -66,6 +66,19 @@ export type EventDoc = {
   at: Timestamp;
 };
 
+/** complaints/{id}/votes/{uid}: one support per account (FR-09). */
+export type VoteDoc = { at: Timestamp };
+
+/** complaints/{id}/comments/{commentId}: plain text, shown under the author's public name. */
+export type CommentDoc = {
+  authorUid: string;
+  authorLabel: string;
+  body: string;
+  hidden: boolean;
+  hiddenReason: string | null;
+  createdAt: Timestamp;
+};
+
 /** complaints/{id}/attachments/{attachmentId}. Bytes live in object storage under `key`. */
 export type AttachmentDoc = {
   key: string;

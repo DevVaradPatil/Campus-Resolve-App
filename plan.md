@@ -15,7 +15,7 @@ admin workflow & escalation → dashboards & notifications → hardening & recov
 | 2 | Foundation: roster, auth, roles, audit | ✅ Done (security review in Phase 7) |
 | 3 | Complaint core: submit, route, upload, feed | ✅ Done on emulators (Supabase bucket check is in the Phase 0 spike) |
 | 4 | Workflow: assign, status, deadlines, escalate, resolve, close, reopen | ✅ Done (reminders/notifications move to Phase 5) |
-| 5 | Community & notifications | 🟨 Notifications done; upvotes, comments, reports, duplicates next |
+| 5 | Community & notifications | 🟨 Notifications, support, comments done; reports and duplicates next |
 | 6 | Dashboards, contacts, analytics, export | ⬜ Not started |
 | 7 | Hardening & recovery | ⬜ Not started |
 | 8 | Deploy & pilot | ⬜ Not started |
@@ -262,8 +262,8 @@ Tests
 
 **Goal:** upvotes, comments, duplicates, moderation, in-app notifications (PRD §4.4, §13).
 
-- [ ] Upvotes: `complaints/{id}/votes/{uid}` toggle in a transaction, updating `supportCount` on the internal and public docs. Rate limit 30/10 min (FR-09).
-- [ ] Comments: create (10/10 min, length cap, plain text rendered safely), author shown by pseudonym, admin/committee hide with reason (FR-10)
+- [x] Support ("Affects me too"): `complaints/{id}/votes/{uid}` toggled in a transaction (`POST /api/complaints/[id]/support`), `supportCount` incremented on the internal and public docs together, audited, 30 changes/10 min. Only public, visible complaints, and not your own.
+- [x] Comments: `complaints/{id}/comments` via `GET/POST /api/complaints/[id]/comments` (20 per page, newest first), 2–1000 chars, 10/10 min, plain text (React escapes), shown under the pseudonym ("Hostel admin" for admins; "(reporter)" marked). Audit records the comment id, never the text. Reporter is notified; on confidential complaints the thread is reporter ↔ admins and admins are notified without content. Moderators (`content.moderate`: committee, admin) hide with a reason; hidden comments stay visible to moderators only.
 - [ ] Report content (complaint/comment/image) → moderation queue. Committee/admin resolve the report: hide, keep, or unpublish image without deleting the complaint (§11.3).
 - [ ] Pseudonyms: consistent per-user alias generated at activation. Admin can force the generic "A resident" label.
 - [ ] Duplicates: student "report as duplicate of…"; admin links duplicate → primary in a transaction. Both histories preserved, support counts aggregated on the primary, confidential reporter's identity and attachments never exposed through the link (FR-08).
@@ -272,7 +272,7 @@ Tests
   - [x] Sweep: reminder to the reporter ~12 h before auto-close, once per resolution (`notifyOnce`). Overdue escalations notify admins and the reporter.
   - [x] Confidential complaints: no title or notes in the preview, only the ticket number. Staff-only (internal) event notes never go into notifications.
   - [ ] *Changed:* no separate "unassigned reminder" or lead/backup setting. In a 1–2 admin pilot every active admin is the lead, and the overdue escalation already alerts them. Add a lead/backup setting if the admin team grows.
-  - [ ] Comment on own complaint (lands with comments)
+  - [x] Comment on own complaint
 - [x] Notification centre `/notifications`: client listener on the latest 20 (rules: own docs only, `limit <= 20`), unread badge in the shell from the same kind of listener, mark read on open and "mark all read" via `POST /api/notifications/read` (own docs only)
 - [x] Preference: "Only important notifications" switch on `/more` (`POST /api/me/preferences`, audited). Muting filters the view and the badge; nothing is dropped.
 - [ ] Optional if capacity permits: follow complaints (not a launch blocker)
@@ -370,6 +370,7 @@ Email/WhatsApp/SMS, PWA install, maps, staff accounts, multi-hostel, institution
 ## Change log
 
 - 2026-10-21: Plan created from PRD v1.0.
+- 2026-10-22: Phase 5 slice 2: support votes and comments with moderation.
 - 2026-10-22: Phase 5 slice 1: in-app notifications (transactional, deduped, confidential-safe), notification centre, mute preference, pre-closure reminder.
 - 2026-10-22: Phase 4 landed: lifecycle module, action route, sweep + GitHub cron, admin queue, committee page, feedback, audited reporter lookup.
 - 2026-10-22: npm override `jwks-rsa@^3.2.2` fixes the Vercel API 500 (ERR_REQUIRE_ESM on jose).
