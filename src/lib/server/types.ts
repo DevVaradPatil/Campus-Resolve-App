@@ -1,6 +1,7 @@
 import "server-only";
 import type { Timestamp } from "firebase-admin/firestore";
 import type { ComplaintRecord, Status } from "@/lib/domain/complaint";
+import type { EventType } from "@/lib/domain/lifecycle";
 import type { Role } from "@/lib/domain/permissions";
 
 // Firestore document shapes. None of these are client-readable.
@@ -54,10 +55,12 @@ export type ComplaintDoc = ComplaintRecord<Timestamp>;
 
 /** complaints/{id}/events/{eventId}: append-only history. */
 export type EventDoc = {
-  type: "created" | "escalated";
+  type: EventType;
   status: Status;
   actorUid: string | null; // null = system
   note: string | null;
+  /** Staff-only. Missing on Phase 3 events, which were all public. */
+  internal?: boolean;
   at: Timestamp;
 };
 

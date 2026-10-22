@@ -3,10 +3,11 @@
 import clsx from "clsx";
 import { ChevronRight, Lock, ThumbsUp } from "lucide-react";
 import Link from "next/link";
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import { EscalatedBadge, PriorityBadge, StatusBadge, Tag, TicketId } from "@/components/ui/badge";
 import type { IssueSummary, Status } from "@/lib/domain/complaint";
 import { formatDateTime } from "@/lib/format";
+import type { QueueItem } from "@/lib/server/queue";
 
 /** Safe public location, e.g. ["Block B", "Second floor", "Common bathroom"]. Never a room number. */
 export function LocationPath({ parts, className }: { parts: string[]; className?: string }) {
@@ -28,7 +29,16 @@ export function LocationPath({ parts, className }: { parts: string[]; className?
 export type PublicIssue = IssueSummary;
 
 /** One row on the register: a feed item inside a Panel's RuledList. */
-export function IssueRow({ issue, href }: { issue: PublicIssue; href: string }) {
+export function IssueRow({
+  issue,
+  href,
+  meta,
+}: {
+  issue: PublicIssue;
+  href: string;
+  /** Extra line for staff lists, e.g. deadline and assignee. */
+  meta?: ReactNode;
+}) {
   return (
     <li className="relative flex gap-3 px-4 py-4 hover:bg-paper">
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
@@ -50,6 +60,7 @@ export function IssueRow({ issue, href }: { issue: PublicIssue; href: string }) 
           </Link>
         </h3>
         <LocationPath parts={issue.location} />
+        {meta && <p className="flex flex-wrap gap-x-3 text-sm">{meta}</p>}
         <p className="flex flex-wrap items-center gap-x-3 text-xs text-muted">
           <TicketId id={issue.ticketId} />
           <span>{issue.category}</span>
@@ -134,5 +145,24 @@ export function Stepper({ steps, current }: { steps: string[]; current: number }
         ))}
       </ol>
     </nav>
+  );
+}
+
+/** Deadline + assignee line for a queue row. */
+export function QueueMeta({ item }: { item: QueueItem }) {
+  return (
+    <>
+      {item.confirmationDeadline ? (
+        <span>Closes {formatDateTime(item.confirmationDeadline)} unless the reporter replies</span>
+      ) : item.overdue ? (
+        <span className="font-semibold text-danger">
+          Overdue since {formatDateTime(item.deadline)}
+        </span>
+      ) : item.status !== "closed" ? (
+        <span className="text-muted">Respond by {formatDateTime(item.deadline)}</span>
+      ) : null}
+      <span className="text-muted">{item.assignee ? `→ ${item.assignee}` : "Unassigned"}</span>
+      {item.hidden && <span className="text-muted">Hidden from feed</span>}
+    </>
   );
 }

@@ -4,6 +4,7 @@ import { FileQuestion, Lock } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
+import { ComplaintActions } from "@/components/complaint-actions";
 import { LocationPath, StatusTimeline } from "@/components/issue";
 import { EmergencyNotice, PublicPhotoNotice } from "@/components/notices";
 import { EscalatedBadge, PriorityBadge, StatusBadge, Tag, TicketId } from "@/components/ui/badge";
@@ -113,7 +114,21 @@ export default function ComplaintPage() {
           </span>
         </p>
         <LocationPath parts={c.location} />
+        {c.workflow.assignee && (
+          <p className="text-sm">
+            Assigned to <span className="font-semibold">{c.workflow.assignee}</span>
+          </p>
+        )}
+        {c.workflow.closureReason && (
+          <p className="text-sm text-muted">
+            {c.workflow.closureReason === "student_confirmed"
+              ? "Closed after the reporter confirmed it was fixed."
+              : "Closed automatically: the reporter didn't reply before the deadline."}
+          </p>
+        )}
       </header>
+
+      <ComplaintActions c={c} onChanged={load} />
 
       {c.priority === "critical" && config && (
         <EmergencyNotice contacts={config.emergencyContacts} />

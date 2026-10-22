@@ -131,13 +131,26 @@ export type ComplaintRecord<T> = {
   reporterLabel: string;
   visibility: Visibility;
   status: Status;
+  /** isOpen(status), stored so the admin queue can filter on it. */
+  open: boolean;
   escalated: boolean;
   hidden: boolean;
+  hiddenReason: string | null;
   routing: { contactId: string | null; ruleId: string | null };
   assignedContactId: string | null;
   supportCount: number;
   attachmentCount: number;
+  /** Start of the current handling cycle: creation, or the latest reopen. */
+  activeSince: T;
   firstActionDeadline: T;
+  /** First documented handling action in this cycle (PRD §6.2: the deadline measures this). */
+  firstActionAt: T | null;
+  resolvedAt: T | null;
+  resolutionNote: string | null;
+  confirmationDeadline: T | null;
+  closedAt: T | null;
+  closureReason: "student_confirmed" | "confirmation_window_expired" | null;
+  feedback: { rating: number; comment: string | null } | null;
   createdAt: T;
   updatedAt: T;
 };

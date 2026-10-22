@@ -70,6 +70,16 @@ export async function deleteObject(key: string) {
   else await rm(local(key), { force: true });
 }
 
+/** Cheap authenticated call so the free Supabase project never counts as idle (D2). */
+export async function ping() {
+  if (supabase)
+    await storageApi(`object/list/${env.SUPABASE_BUCKET}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prefix: "", limit: 1 }),
+    });
+}
+
 const sign = (key: string, exp: number) =>
   createHmac("sha256", SIGNING_KEY).update(`${key}\n${exp}`).digest("base64url");
 

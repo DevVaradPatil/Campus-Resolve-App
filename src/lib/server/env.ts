@@ -25,6 +25,8 @@ const schema = z
     FIREBASE_PRIVATE_KEY: optional,
     ACTIVATION_CODE_PEPPER: secret,
     RATE_LIMIT_IP_SALT: secret,
+    // Shared secret for POST /api/cron/sweep (D3). Unset → the endpoint refuses every call.
+    CRON_SECRET: secret,
     // Photo storage (plan.md D2). Unset → local disk, emulators only.
     SUPABASE_URL: z.preprocess(blank, z.url().optional()),
     SUPABASE_SECRET_KEY: z.preprocess(blank, z.string().min(20).optional()),

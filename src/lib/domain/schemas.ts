@@ -145,3 +145,43 @@ export const createComplaintInput = z.object({
   visibility: z.enum(VISIBILITIES),
 });
 export type CreateComplaintInput = z.infer<typeof createComplaintInput>;
+
+// --- Workflow (PRD §6). Who may send which action is checked on the server. ---
+
+const reason = z.string().trim().min(3, "Give a short reason.").max(500);
+const note = z.string().trim().min(3, "Write a short note.").max(1000);
+
+export const workflowInput = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("assign"), contactId: slug }),
+  z.object({ type: z.literal("start"), note: optionalText(1000) }),
+  z.object({ type: z.literal("note"), note }),
+  z.object({ type: z.literal("resolve"), note }),
+  z.object({ type: z.literal("priority"), priority: z.enum(PRIORITIES), reason }),
+  z.object({ type: z.literal("escalate"), reason }),
+  z.object({ type: z.literal("hide"), reason }),
+  z.object({ type: z.literal("unhide") }),
+  z.object({ type: z.literal("confirm") }),
+  z.object({ type: z.literal("reopen"), note: optionalText(1000) }),
+  z.object({
+    type: z.literal("feedback"),
+    rating: z.number().int().min(1).max(5),
+    comment: optionalText(500),
+  }),
+]);
+export type WorkflowInput = z.infer<typeof workflowInput>;
+
+const queryParam = <T extends z.ZodType>(s: T) =>
+  z.preprocess((v) => (v === "" ? undefined : v), s.optional());
+
+/** GET /api/admin/complaints search params. */
+export const queueQuery = z.object({
+  view: z.enum(["active", "resolved", "closed"]).default("active"),
+  status: queryParam(z.enum(["submitted", "assigned", "in_progress", "reopened"])),
+  priority: queryParam(z.enum(PRIORITIES)),
+  categoryId: queryParam(slug),
+  blockId: queryParam(slug),
+  assignee: queryParam(z.union([slug, z.literal("none")])),
+  escalated: queryParam(z.literal("true")),
+  after: queryParam(z.string().regex(/^[a-f0-9]{20}$/)),
+});
+export type QueueQuery = z.infer<typeof queueQuery>;

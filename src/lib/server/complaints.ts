@@ -15,7 +15,8 @@ import {
   type Visibility,
 } from "@/lib/domain/complaint";
 import { can } from "@/lib/domain/permissions";
-import type { CreateComplaintInput } from "@/lib/domain/schemas";
+import { isOverdue } from "@/lib/domain/lifecycle";
+import type { CreateComplaintInput, WorkflowInput } from "@/lib/domain/schemas";
 import { writeAudit } from "./audit";
 import type { SessionUser } from "./auth";
 import { loadConfig } from "./config";
@@ -24,12 +25,14 @@ import { HttpError } from "./http";
 import { reencodeImage } from "./images";
 import { consume, LIMITS } from "./rate-limit";
 import { deleteObject, putObject, signedUrl } from "./storage";
+import { availableActions } from "./workflow";
 import type { AttachmentDoc, ComplaintDoc, EventDoc } from "./types";
 
 const db = adminDb;
 const PAGE = 20;
 const MB = 1024 * 1024;
-const notFound = () => new HttpError(404, "That complaint doesn't exist or isn't visible to you.");
+export const notFound = () =>
+  new HttpError(404, "That complaint doesn't exist or isn't visible to you.");
 
 /** Deterministic per (user, draft key), so a retried submit finds the ticket it already made. */
 const complaintId = (uid: string, key: string) =>
@@ -61,7 +64,8 @@ export async function createComplaint(user: SessionUser, input: CreateComplaintI
   const { priority, rule } = priorityFor(cat, sub?.id ?? null);
   const routing = routeComplaint(cfg.routingRules, cfg.contacts, cat.id, block?.id ?? null);
   const critical = priority === "critical";
-  const deadline = Timestamp.fromMillis(firstActionDeadline(priority, Date.now()));
+  const nowMs = Date.now();
+  const deadline = Timestamp.fromMillis(firstActionDeadline(priority, nowMs));
 
   return db.runTransaction(async (tx) => {
     const counterRef = db.doc("systemSettings/ticketCounter");
@@ -88,13 +92,23 @@ export async function createComplaint(user: SessionUser, input: CreateComplaintI
       reporterLabel: user.pseudonym,
       visibility: input.visibility,
       status: "submitted",
+      open: true,
       escalated: critical,
       hidden: false,
+      hiddenReason: null,
       routing,
       assignedContactId: null,
       supportCount: 0,
       attachmentCount: 0,
+      activeSince: Timestamp.fromMillis(nowMs),
       firstActionDeadline: deadline,
+      firstActionAt: null,
+      resolvedAt: null,
+      resolutionNote: null,
+      confirmationDeadline: null,
+      closedAt: null,
+      closureReason: null,
+      feedback: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -130,10 +144,10 @@ export async function createComplaint(user: SessionUser, input: CreateComplaintI
   });
 }
 
-type Viewer = "owner" | "staff" | "public";
+export type Viewer = "owner" | "staff" | "public";
 
 /** Who may see this complaint, and how much. null = it doesn't exist for them (404, not 403). */
-function viewerOf(user: SessionUser, c: ComplaintDoc): Viewer | null {
+export function viewerOf(user: SessionUser, c: ComplaintDoc): Viewer | null {
   if (c.reporterUid === user.uid) return "owner";
   if (
     can(user, "complaints.manage") &&
@@ -170,9 +184,27 @@ export type ComplaintView = {
   photos: { id: string; url: string }[];
   canAddPhotos: boolean;
   timeline: { id: string; status: Status; at: string; note?: string; byline: string }[];
+  /** No recorded action and past the first-action deadline. */
+  overdue: boolean;
+  workflow: {
+    assignee: string | null;
+    resolutionNote: string | null;
+    closureReason: ComplaintDoc["closureReason"];
+    /** Owner and staff only. */
+    confirmationDeadline: string | null;
+    feedback: ComplaintDoc["feedback"];
+    hidden: boolean;
+    /** Staff only. */
+    hiddenReason: string | null;
+  };
+  /** Workflow actions this user can take right now. */
+  actions: WorkflowInput["type"][];
+  /** Staff only: who it can be assigned to. */
+  assignees: { id: string; name: string }[];
 };
 
-const iso = (t: Timestamp | null | undefined) => (t ?? Timestamp.now()).toDate().toISOString();
+export const iso = (t: Timestamp | null | undefined) =>
+  (t ?? Timestamp.now()).toDate().toISOString();
 
 export async function getComplaint(user: SessionUser, id: string): Promise<ComplaintView> {
   const ref = db.doc(`complaints/${id}`);
@@ -181,10 +213,13 @@ export async function getComplaint(user: SessionUser, id: string): Promise<Compl
   if (!c || !viewer) throw notFound();
   const privileged = viewer !== "public";
 
-  const [events, attachments] = await Promise.all([
+  const staff = viewer === "staff";
+  const [events, attachments, cfg] = await Promise.all([
     ref.collection("events").orderBy("at").get(),
     ref.collection("attachments").orderBy("createdAt").get(),
+    staff || c.assignedContactId ? loadConfig() : null,
   ]);
+  const contacts = cfg?.contacts ?? [];
   const visible = attachments.docs.filter((d) => {
     const a = d.data() as AttachmentDoc;
     return privileged || (a.privacy === "public" && a.publication === "published");
@@ -227,27 +262,51 @@ export async function getComplaint(user: SessionUser, id: string): Promise<Compl
       : null,
     photos,
     canAddPhotos: viewer === "owner" && c.attachmentCount < FIELD_LIMITS.photos,
-    timeline: events.docs.map((d) => {
-      const e = d.data() as EventDoc;
-      return {
-        id: d.id,
-        status: e.status,
-        at: iso(e.at),
-        ...(e.note && { note: e.note }),
-        byline:
-          e.type === "created"
-            ? viewer === "owner"
-              ? "You reported this"
-              : `Reported by ${c.reporterLabel}`
-            : e.actorUid
-              ? "Recorded by admin"
-              : "Automatic",
-      };
-    }),
+    timeline: events.docs
+      .filter((d) => staff || !(d.data() as EventDoc).internal)
+      .map((d) => {
+        const e = d.data() as EventDoc;
+        return {
+          id: d.id,
+          status: e.status,
+          at: iso(e.at),
+          ...(e.note && { note: e.note }),
+          byline:
+            e.type === "created"
+              ? viewer === "owner"
+                ? "You reported this"
+                : `Reported by ${c.reporterLabel}`
+              : !e.actorUid
+                ? "Automatic"
+                : e.actorUid === c.reporterUid
+                  ? viewer === "owner"
+                    ? "You"
+                    : c.reporterLabel
+                  : // Staff have no accounts: updates are recorded by an admin (PRD §17).
+                    e.type === "escalated"
+                    ? "Hostel committee"
+                    : "Recorded by admin",
+        };
+      }),
+    overdue: isOverdue(c, Date.now(), (t) => t.toMillis()),
+    workflow: {
+      assignee: contacts.find((x) => x.id === c.assignedContactId)?.name ?? null,
+      resolutionNote: c.resolutionNote ?? null,
+      closureReason: c.closureReason ?? null,
+      confirmationDeadline:
+        privileged && c.confirmationDeadline ? iso(c.confirmationDeadline) : null,
+      feedback: privileged ? (c.feedback ?? null) : null,
+      hidden: privileged && c.hidden,
+      hiddenReason: staff ? (c.hiddenReason ?? null) : null,
+    },
+    actions: availableActions(user, viewer, c),
+    assignees: staff
+      ? contacts.filter((x) => x.active).map((x) => ({ id: x.id, name: x.name }))
+      : [],
   };
 }
 
-const toSummary = (id: string, c: ComplaintDoc): IssueSummary => ({
+export const toSummary = (id: string, c: ComplaintDoc): IssueSummary => ({
   id,
   ticketId: c.ticketId,
   title: c.title,

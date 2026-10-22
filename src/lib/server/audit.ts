@@ -1,5 +1,6 @@
 import "server-only";
 import { FieldValue, type Transaction, type WriteBatch } from "firebase-admin/firestore";
+import type { WorkflowInput } from "@/lib/domain/schemas";
 import { adminDb } from "./firebase-admin";
 
 export type AuditAction =
@@ -18,6 +19,7 @@ export type AuditAction =
   | "config.seed"
   | "config.update"
   | "complaint.create"
+  | `complaint.${WorkflowInput["type"] | "auto_close" | "reporter_view"}`
   | "attachment.upload";
 
 export type AuditEntry = {

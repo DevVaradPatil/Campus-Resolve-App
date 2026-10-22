@@ -1,10 +1,16 @@
-import { ChevronRight, Settings2, Users } from "lucide-react";
+import { ChevronRight, Inbox, Settings2, Users } from "lucide-react";
 import Link from "next/link";
 import { Panel, RuledList } from "@/components/ui/surface";
 
 export const metadata = { title: "Admin · CampusResolve" };
 
 const SECTIONS = [
+  {
+    href: "/admin/complaints",
+    icon: Inbox,
+    title: "Complaint queue",
+    body: "Assign, update and resolve complaints. Overdue ones come first.",
+  },
   {
     href: "/admin/roster",
     icon: Users,

@@ -14,7 +14,7 @@ admin workflow & escalation → dashboards & notifications → hardening & recov
 | 1 | Design system | ✅ Done (real-phone/axe pass deferred to Phase 7) |
 | 2 | Foundation: roster, auth, roles, audit | ✅ Done (security review in Phase 7) |
 | 3 | Complaint core: submit, route, upload, feed | ✅ Done on emulators (Supabase bucket check is in the Phase 0 spike) |
-| 4 | Workflow: assign, status, deadlines, escalate, resolve, close, reopen | ⬜ Not started |
+| 4 | Workflow: assign, status, deadlines, escalate, resolve, close, reopen | ✅ Done (reminders/notifications move to Phase 5) |
 | 5 | Community & notifications | ⬜ Not started |
 | 6 | Dashboards, contacts, analytics, export | ⬜ Not started |
 | 7 | Hardening & recovery | ⬜ Not started |
@@ -225,33 +225,36 @@ Tests
 
 **Goal:** complete lifecycle with an accurate history (PRD §4.3, §6).
 
-- [ ] `lifecycle.ts`: allowed transitions `Submitted → Assigned → In progress → Resolved → Closed`, plus `Reopened` (from Resolved/Closed → active) and the Escalated flag/event. Rejected/hidden is a moderation action with a mandatory reason, not a status.
-- [ ] Admin routes (each runs a transaction + event + audit + public projection update):
-  - [ ] assign/reassign contact (assignment history)
-  - [ ] status update with admin-recorded progress note (labelled "recorded by admin", PRD §17)
-  - [ ] priority override with required reason
-  - [ ] resolve: notes + optional evidence photo, sets `confirmationDeadline` = now + category window
-  - [ ] hide/reject with reason
-- [ ] Student routes: confirm resolved (`student_confirmed`), report "still an issue" → Reopened. Reopening clears the resolution and computes a fresh first-action deadline (§6.1).
-- [ ] Committee route: escalate overdue complaint (permission-checked)
-- [ ] `POST /api/cron/sweep` (secret-protected, idempotent, bounded batch):
-  - [ ] unassigned past threshold → reminder, then escalate to backup contact
-  - [ ] overdue first action → mark escalated + notify lead
-  - [ ] resolved past confirmation window → Closed with `confirmation_window_expired`
-  - [ ] pre-closure reminder to reporter
-  - [ ] keep-alive: one cheap Supabase Storage call per run, so the free project never pauses (D2)
-- [ ] `.github/workflows/sweep-cron.yml` (D3)
-- [ ] Admin queue UI: filters (status, priority, category, block, assignee), overdue-first sort, bulk-safe single actions, complaint detail with internal timeline
-- [ ] Committee views: public complaints, overdue/escalated list, escalate action
-- [ ] Feedback capture on close (rating + optional comment)
+- [x] `src/lib/domain/lifecycle.ts`: pure `applyAction()` for `Submitted → Assigned → In progress → Resolved → Closed`, `Reopened` (from Resolved/Closed), the Escalated flag, priority override and hide/unhide. Hidden is a moderation flag with a reason, not a status. Returns the patch plus an event marked public or staff-only (`internal`).
+- [x] Complaint record gained `open`, `activeSince`, `firstActionAt`, `resolvedAt`, `resolutionNote`, `confirmationDeadline`, `closedAt`, `closureReason`, `hiddenReason`, `feedback`. Complaints created before Phase 4 lack them: they don't show in the queue and the sweep skips them (only test data so far).
+- [x] One route, `POST /api/complaints/[id]/actions` (`workflow.ts`): requireUser → zod → transaction (re-read, role check, lifecycle, then complaint + event + audit + public projection via `writeTransition()`). Illegal transitions → 409, wrong role → 403, invisible → 404.
+  - [x] assign/reassign (history is the `assigned` events; first assignment moves Submitted/Reopened → Assigned)
+  - [x] start / progress note, shown as "Recorded by admin" (PRD §17)
+  - [x] priority override with a staff-only reason; recomputes the deadline from the cycle start
+  - [x] resolve with a note; sets `confirmationDeadline` from the category window. *Evidence photo deferred:* the photo pipeline is owner-only for now.
+  - [x] hide/unhide with reason (removes/restores the public doc)
+- [x] Reporter actions: confirm (`student_confirmed`), reopen (fresh `activeSince` and deadline; resolution, closure, feedback and `firstActionAt` cleared; critical re-escalates), feedback once on closed complaints (1–5 + comment, private, audited)
+- [x] Escalate: anyone with `complaints.escalate` (committee, admin) on a complaint they can see, with a staff-only reason
+- [x] `GET /api/complaints/[id]/reporter`: reporter name/roll/room for `reporter.view`, every look audited
+- [x] `POST /api/cron/sweep` (`sweep.ts`, `CRON_SECRET` bearer, ≤50 per step, each item re-checked in its own transaction so double runs are no-ops):
+  - [x] overdue first action (no `firstActionAt` past `firstActionDeadline`) → escalated + event
+  - [x] resolved past the confirmation window → Closed with `confirmation_window_expired`
+  - [x] Supabase keep-alive (`storage.ping()`), failure logged but not fatal
+  - [ ] Phase 5: reminders and notifications (unassigned reminder, lead/backup notification on escalation, pre-closure reminder to reporter). They need `notify.ts`; the hooks are commented in `sweep.ts`/`complaints.ts`.
+- [x] Admin queue and committee GETs run `maybeSweep()` (at most every 10 min) between cron runs (D3)
+- [x] `.github/workflows/sweep-cron.yml`: every 30 min + manual run, needs repo secrets `SWEEP_URL`, `CRON_SECRET`
+- [x] Admin queue `/admin/complaints` (`GET /api/admin/complaints`): Needs action (by deadline, so overdue first; filters status, priority, category, block, assignee, escalated) / Awaiting confirmation / Closed. Staff without `confidential.view` only get public complaints.
+- [x] Complaint page action panel (`complaint-actions.tsx`): only the actions the server says are possible; reporter's "Is it fixed?" is the screen's one Highlight
+- [x] Committee page `/committee`: overdue or escalated public complaints (never confidential); escalate from the complaint page
+- [x] Indexes: sweep (firstActionAt, escalated, firstActionDeadline), (status, confirmationDeadline), (status, updatedAt), and per-field × firstActionDeadline for the queue filters
 
 Tests
-- [ ] Unit: every allowed/forbidden transition, reopen resets deadline, closure reasons
-- [ ] Security: student cannot change status/priority/assignment/owner via API manipulation. Committee cannot assign/resolve (FR-07).
-- [ ] Integration: sweep closes only expired items, is idempotent across double runs (FR-11, FR-12)
-- [ ] E2E: submit → assign → resolve → auto-close. Submit → resolve → reopen.
+- [x] Unit (lifecycle.test.ts, 20): happy path, reassign, first-action stamping, resolve window, 10 forbidden transitions, no double escalate/hide/same priority, reopen reset, auto-close timing, confirm vs expiry, override deadline + internal reason, overdue
+- [x] Integration (workflow.test.ts, 14): full lifecycle with events/audits/projection/feedback privacy; 409s; FR-07 (students and committee can't assign/override/hide, committee can escalate, only the reporter confirms/reopens, confidential is 404 for committee); FR-12 reopen; hide/unhide; internal notes hidden from owner and public; audited reporter lookup; FR-11 sweep escalation and auto-close, each idempotent; cron secret; queue ordering and filters; committee list excludes confidential
+- [x] Browser check (emulators): admin queue → assign → in progress → resolve → audited reporter lookup; reporter sees the highlighted "Is it fixed?" with note and auto-close date → confirm → 5/5 feedback. All API calls 200.
+- [ ] E2E (Playwright): *deferred.* The route-level integration tests cover the same flows without adding a browser toolchain to CI; revisit if UI regressions show up.
 
-**Exit (PRD Phase 3, part 1):** full lifecycle and permission tests pass.
+**Exit (PRD Phase 3, part 1):** ✅ full lifecycle and permission tests pass. Reminders/notifications land with Phase 5.
 
 ---
 
@@ -266,6 +269,7 @@ Tests
 - [ ] Duplicates: student "report as duplicate of…"; admin links duplicate → primary in a transaction. Both histories preserved, support counts aggregated on the primary, confidential reporter's identity and attachments never exposed through the link (FR-08).
 - [ ] Notifications: `lib/server/notify.ts` creates notification docs with a dedupe key (type + ticket + recipient + time bucket). Creation is decoupled from delivery, so email can be added later.
   - [ ] Events: assignment, status change, resolution request, pre-closure reminder, reopen, comment on own complaint, escalation outcome, critical escalation to lead
+  - [ ] Sweep reminders (from Phase 4): unassigned-complaint reminder to admins, overdue escalation to the designated lead and backup (add a "lead"/"backup" setting)
   - [ ] Previews of confidential tickets carry no content (§12.4)
 - [ ] Notification centre UI: unread count via a client listener limited to the latest 20, mark read / mark all read (via API)
 - [ ] Preference: mute non-essential notifications
@@ -364,6 +368,7 @@ Email/WhatsApp/SMS, PWA install, maps, staff accounts, multi-hostel, institution
 ## Change log
 
 - 2026-10-21: Plan created from PRD v1.0.
+- 2026-10-22: Phase 4 landed: lifecycle module, action route, sweep + GitHub cron, admin queue, committee page, feedback, audited reporter lookup.
 - 2026-10-22: npm override `jwks-rsa@^3.2.2` fixes the Vercel API 500 (ERR_REQUIRE_ESM on jose).
 - 2026-10-22: First Vercel deploy. API 500 under investigation; `vercel.json` pins functions to bom1; `seed-dev.ts --real` for first setup of a real project.
 - 2026-10-22: D1 = Vercel, D2 = Supabase Storage (R2 needs a card). Supabase storage backend added; `origin` set to GitHub and `main` pushed; `.firebaserc` alias `dev` → `campusresolve-dev`.

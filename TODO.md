@@ -12,15 +12,15 @@ Secrets go in `.env.local` (dev) or the host's env settings (prod). **Never comm
 - [x] ~~Install Node + Firebase CLI~~. Node 24 and Java 21 are present, and the Firebase CLI is a project devDependency.
 - [x] ~~`firebase use --add`~~: `.firebaserc` has alias `dev` → `campusresolve-dev`. Local emulator work keeps using the offline `demo-campusresolve` project.
 - [x] ~~Vercel → import the repo~~: live at https://campusresolveiitk.vercel.app (functions pinned to Mumbai `bom1` via `vercel.json`).
-- [ ] Run `npx firebase login` once (opens a browser), then deploy the security rules and indexes to the dev project: `npx firebase deploy --only firestore --project dev`
+- [x] Run `npx firebase login` once (opens a browser), then deploy the security rules and indexes to the dev project: `npx firebase deploy --only firestore --project dev`
 
 ## Bootstrap the dev project
 
 These run on your machine against `campusresolve-dev`, using the same values as Vercel:
-- [ ] `npx vercel login`, then `npx vercel link` (pick the project), then `npx vercel env pull .env.production.local --environment=production` (without `--environment` it pulls the empty Development set). That file is git-ignored; never commit or share it. Variables marked **Sensitive** in Vercel come down empty: paste those values into the file by hand.
-- [ ] First admin (you choose the password; Claude never sees it): `npx tsx --env-file=.env.production.local --conditions=react-server scripts/create-admin.ts <handle> "<Name>"`
-- [ ] Starter config (PRD categories + placeholder blocks/contacts/routing; skips fake emergency numbers; refuses if config already exists): `npx tsx --env-file=.env.production.local --conditions=react-server scripts/seed-dev.ts --real`
-- [ ] Then sign in at https://campusresolveiitk.vercel.app/admin/login and adjust blocks/contacts at `/admin/config`.
+- [x] `npx vercel login`, then `npx vercel link` (pick the project), then `npx vercel env pull .env.production.local --environment=production` (without `--environment` it pulls the empty Development set). That file is git-ignored; never commit or share it. Variables marked **Sensitive** in Vercel come down empty: paste those values into the file by hand.
+- [x] First admin (you choose the password; Claude never sees it): `npx tsx --env-file=.env.production.local --conditions=react-server scripts/create-admin.ts <handle> "<Name>"`
+- [x] Starter config (PRD categories + placeholder blocks/contacts/routing; skips fake emergency numbers; refuses if config already exists): `npx tsx --env-file=.env.production.local --conditions=react-server scripts/seed-dev.ts --real`
+- [x] Then sign in at https://campusresolveiitk.vercel.app/admin/login and adjust blocks/contacts at `/admin/config`.
 
 ## Firebase — development project (Phase 0)
 
@@ -28,7 +28,7 @@ These run on your machine against `campusresolve-dev`, using the same values as 
 - [x] ~~Enable Authentication~~
 - [x] ~~Create Firestore~~. Check it's in **Native mode**. The region can't change now; `asia-south1` (Mumbai) was the target.
 - [x] ~~Register a Web app~~. Its config values go into Vercel (below). The snippet's `getAnalytics` / `measurementId` aren't used: the app has no analytics, which is a privacy choice.
-- [ ] Project settings → Service accounts → **Generate new private key**. From the JSON, put `client_email` → `FIREBASE_CLIENT_EMAIL` and `private_key` → `FIREBASE_PRIVATE_KEY` into Vercel (paste the key exactly, including the `-----BEGIN…` lines). Then delete the JSON file or store it outside the repo. Never paste it in chat.
+- [x] Project settings → Service accounts → **Generate new private key**. From the JSON, put `client_email` → `FIREBASE_CLIENT_EMAIL` and `private_key` → `FIREBASE_PRIVATE_KEY` into Vercel (paste the key exactly, including the `-----BEGIN…` lines). Then delete the JSON file or store it outside the repo. Never paste it in chat.
 
 ## Image storage — Supabase (D2)
 
@@ -40,19 +40,19 @@ These run on your machine against `campusresolve-dev`, using the same values as 
 ## Vercel environment variables
 
 Set these in Vercel → Project → Settings → Environment Variables. **Don't** set `NEXT_PUBLIC_USE_EMULATORS` there.
-- [ ] Public web config (from the Firebase web app snippet): `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` (`campusresolve-dev.firebaseapp.com`), `NEXT_PUBLIC_FIREBASE_PROJECT_ID` (`campusresolve-dev`), `NEXT_PUBLIC_FIREBASE_APP_ID`
-- [ ] Server: `FIREBASE_PROJECT_ID` (`campusresolve-dev`), `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
-- [ ] Secrets: `ACTIVATION_CODE_PEPPER`, `RATE_LIMIT_IP_SALT` (generate as in "App secrets" below)
-- [ ] Storage: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_BUCKET`
+- [x] Public web config (from the Firebase web app snippet): `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` (`campusresolve-dev.firebaseapp.com`), `NEXT_PUBLIC_FIREBASE_PROJECT_ID` (`campusresolve-dev`), `NEXT_PUBLIC_FIREBASE_APP_ID`
+- [x] Server: `FIREBASE_PROJECT_ID` (`campusresolve-dev`), `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
+- [x] Secrets: `ACTIVATION_CODE_PEPPER`, `RATE_LIMIT_IP_SALT` (generate as in "App secrets" below)
+- [x] Storage: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_BUCKET`
 
 ## App secrets (Phase 2)
 
 Not needed for local emulator work, which uses built-in dev values. Required for any real Firebase project.
 Generate each with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` (32+ characters):
-- [ ] `ACTIVATION_CODE_PEPPER`: HMAC key for hashing activation codes. Changing it later invalidates every unused code.
-- [ ] `RATE_LIMIT_IP_SALT`: HMAC key for hashing IPs in rate-limit keys
+- [x] `ACTIVATION_CODE_PEPPER`: HMAC key for hashing activation codes. Changing it later invalidates every unused code.
+- [x] `RATE_LIMIT_IP_SALT`: HMAC key for hashing IPs in rate-limit keys
 - [ ] `CRON_SECRET`: shared secret for the sweep endpoint (also add it as a GitHub Actions secret in Phase 4)
-- [ ] Decide who the **first admin** is. For a real project, run this yourself with the real project's env file (Claude never sees the password):
+- [x] Decide who the **first admin** is. For a real project, run this yourself with the real project's env file (Claude never sees the password):
   `npx tsx --env-file=.env.production.local --conditions=react-server scripts/create-admin.ts <handle> "<Name>"`
   Use a password you don't use anywhere else. Admins sign in at `/admin/login` with just the handle.
 - [ ] In each real Firebase project: Firestore → **TTL policies** → add a policy on collection `rateLimits`, field `expiresAt`, so old rate-limit counters delete themselves. Check that TTL is available on the Spark plan. If it isn't, tell Claude and the sweep job will prune them instead.
@@ -72,7 +72,10 @@ Generate each with `node -e "console.log(require('crypto').randomBytes(32).toStr
 
 ## Phase 4 — Scheduler
 
-- [ ] GitHub repo → Settings → Secrets → Actions: add `CRON_SECRET` and `SWEEP_URL` (the deployed `/api/cron/sweep` URL)
+- [ ] Generate a `CRON_SECRET` (same command as the other secrets) and add it to **Vercel** env vars, then redeploy
+- [ ] GitHub repo → Settings → Secrets and variables → Actions: add `CRON_SECRET` (same value) and `SWEEP_URL` = `https://campusresolveiitk.vercel.app/api/cron/sweep`. Then Actions → Sweep → **Run workflow** once to check it goes green.
+- [ ] Redeploy the Firestore indexes (Phase 4 added queue/sweep indexes): `npx firebase deploy --only firestore --project dev`. Index builds take a few minutes; until then the queue may error.
+- [ ] Test complaints made before Phase 4 don't appear in the admin queue. Delete them in the Firebase console (`complaints` and `publicComplaints`) or just make new ones.
 
 ## Phase 7 — Hardening & recovery
 

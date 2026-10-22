@@ -14,6 +14,7 @@ export default defineConfig({
     env: {
       NEXT_PUBLIC_USE_EMULATORS: "true",
       FIREBASE_PROJECT_ID: "demo-campusresolve",
+      CRON_SECRET: "test-cron-secret-0123456789abcdefghij",
       NEXT_PUBLIC_FIREBASE_PROJECT_ID: "demo-campusresolve",
     },
   },

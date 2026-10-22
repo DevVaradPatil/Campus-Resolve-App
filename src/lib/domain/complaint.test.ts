@@ -103,6 +103,15 @@ describe("searchTokens", () => {
 
 describe("toPublicComplaint", () => {
   const record: ComplaintRecord<number> = {
+    hiddenReason: null,
+    activeSince: 0,
+    firstActionAt: null,
+    resolvedAt: null,
+    resolutionNote: "fixed tap",
+    confirmationDeadline: null,
+    closedAt: null,
+    closureReason: null,
+    feedback: { rating: 2, comment: "slow" },
     ticketId: "CR-000001",
     title: "Leaking tap",
     description: "Tap leaks all night",
@@ -119,6 +128,7 @@ describe("toPublicComplaint", () => {
     reporterLabel: "Quiet Heron",
     visibility: "public",
     status: "submitted",
+    open: true,
     escalated: false,
     hidden: false,
     routing: { contactId: "maintenance", ruleId: "infrastructure" },
@@ -154,7 +164,16 @@ describe("toPublicComplaint", () => {
       ].sort(),
     );
     const json = JSON.stringify(pub);
-    for (const leak of ["secret-uid", "214", "urgentFlag", "routing", "priorityRule"])
+    for (const leak of [
+      "secret-uid",
+      "214",
+      "urgentFlag",
+      "routing",
+      "priorityRule",
+      "feedback",
+      "slow",
+      "hiddenReason",
+    ])
       expect(json).not.toContain(leak);
   });
 

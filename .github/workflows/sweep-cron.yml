@@ -1,0 +1,23 @@
+name: Sweep
+
+# Deadline escalation and auto-close (plan.md D3). The app has no scheduler of its own on the
+# free tiers, so GitHub calls the secret-protected endpoint. GitHub may delay or skip runs under
+# load; admin and committee page visits also trigger the sweep, and it's idempotent either way.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call /api/cron/sweep
+        env:
+          SWEEP_URL: ${{ secrets.SWEEP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl --fail-with-body --silent --show-error --max-time 120 \
+            -X POST -H "Authorization: Bearer $CRON_SECRET" "$SWEEP_URL"
