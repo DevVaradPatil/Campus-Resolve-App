@@ -29,6 +29,7 @@ jobs:
         env:
           NEXT_PUBLIC_USE_EMULATORS: "true"
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-campusresolve
+          FIREBASE_PROJECT_ID: demo-campusresolve
 
   secrets:
     # Fails the build if a key, token or private key lands in the repo history.
