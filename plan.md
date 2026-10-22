@@ -77,7 +77,7 @@ tests/rules/, tests/e2e/
 - [x] `.env.example` listing every variable (names only)
 - [x] `src/lib/server/env.ts` (zod, `server-only`), `src/lib/server/firebase-admin.ts`, `src/lib/client/firebase.ts`. Both SDKs auto-target the emulators when `NEXT_PUBLIC_USE_EMULATORS=true`.
 - [x] `npm overrides` pins `@grpc/grpc-js@^1.14.6` (the Firebase client SDK ships a vulnerable 1.9.x). `npm audit --omit=dev` is clean.
-- [ ] **Runtime spike on D1 target**, deployed preview (blocked on the Vercel/Firebase/R2 accounts in TODO.md):
+- [ ] **Runtime spike on D1 target** (https://campusresolveiitk.vercel.app, 2026-10-22): build passes and pages serve; signed-out Firestore REST reads get 403 (rules not open). **API routes return a bare 500 on Vercel**: the same build with non-emulator settings returns 401 locally, so it's deployment config or bundling; waiting on the Vercel runtime log. Functions pinned to `bom1` (Mumbai, next to Firestore `asia-south1`).
   - [x] Admin SDK `createCustomToken` → client `signInWithCustomToken` → `verifyIdToken`: passes against emulators (`tests/integration/custom-token.test.ts`). Still needs re-checking on a Vercel preview with a real service account.
   - [x] Admin SDK concurrent Firestore transactions (ticket counter) pass against emulators. Still needs re-checking from a deployed route handler.
   - [ ] `sharp` re-encode + EXIF strip inside a deployed route handler
@@ -364,6 +364,7 @@ Email/WhatsApp/SMS, PWA install, maps, staff accounts, multi-hostel, institution
 ## Change log
 
 - 2026-10-21: Plan created from PRD v1.0.
+- 2026-10-22: First Vercel deploy. API 500 under investigation; `vercel.json` pins functions to bom1; `seed-dev.ts --real` for first setup of a real project.
 - 2026-10-22: D1 = Vercel, D2 = Supabase Storage (R2 needs a card). Supabase storage backend added; `origin` set to GitHub and `main` pushed; `.firebaserc` alias `dev` → `campusresolve-dev`.
 - 2026-10-22: Phase 3 landed: config + admin setup screen, complaint submit/route/escalate, photo pipeline (local storage backend until D2), My complaints, detail, public feed, rules + indexes. sharp added as a direct dependency. Fixed `route()` swallowing Next's prerender bail-out (now `unstable_rethrow`), and wrapped `RequireAuth` in Suspense so dynamic routes build.
 - 2026-10-22: Phase 2 landed: roster, activation, login, roles, audit, rate limits; admin roster UI. tsx added for scripts.

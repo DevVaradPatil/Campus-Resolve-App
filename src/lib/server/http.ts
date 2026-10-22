@@ -1,5 +1,4 @@
 import "server-only";
-import { unstable_rethrow } from "next/navigation";
 import { ZodError, type ZodType } from "zod";
 
 export class HttpError extends Error {
@@ -24,8 +23,10 @@ export function route<C>(fn: (req: Request, ctx: C) => Promise<Response>) {
     try {
       return await fn(req, ctx);
     } catch (e) {
-      // Next's own control-flow errors (e.g. "this route is dynamic" during prerender) must pass through.
-      unstable_rethrow(e);
+      // Next's own control-flow errors (e.g. "this route is dynamic" during prerender) must pass
+      // through. Loaded lazily: scripts import this module outside Next, where next/navigation
+      // pulls in client React and crashes under the react-server condition.
+      (await import("next/navigation")).unstable_rethrow(e);
       if (e instanceof HttpError)
         return Response.json({ error: e.message, ...e.extra }, { status: e.status });
       if (e instanceof ZodError)

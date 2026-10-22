@@ -11,8 +11,17 @@ Secrets go in `.env.local` (dev) or the host's env settings (prod). **Never comm
 - [x] ~~GitHub repo~~: `origin` is https://github.com/DevVaradPatil/Campus-Resolve-App and `main` is pushed.
 - [x] ~~Install Node + Firebase CLI~~. Node 24 and Java 21 are present, and the Firebase CLI is a project devDependency.
 - [x] ~~`firebase use --add`~~: `.firebaserc` has alias `dev` → `campusresolve-dev`. Local emulator work keeps using the offline `demo-campusresolve` project.
-- [ ] **Vercel → import the repo.** In Vercel (account varadapatil123@gmail.com): Account Settings → Authentication / Git → connect the GitHub account `DevVaradPatil`, then Add New → Project → import `Campus-Resolve-App`. Framework preset Next.js, no other build settings. Then add the env vars listed in "Vercel environment variables" below for **Preview and Production**, and redeploy.
+- [x] ~~Vercel → import the repo~~: live at https://campusresolveiitk.vercel.app (functions pinned to Mumbai `bom1` via `vercel.json`).
+- [ ] **API routes return 500 on Vercel** while pages load. Open Vercel → the project → **Logs**, filter by `/api/me`, open a 500 entry and paste its error message to Claude (cut out any key values if they appear).
 - [ ] Run `npx firebase login` once (opens a browser), then deploy the security rules and indexes to the dev project: `npx firebase deploy --only firestore --project dev`
+
+## Bootstrap the dev project (after the API 500 is fixed)
+
+These run on your machine against `campusresolve-dev`, using the same values as Vercel:
+- [ ] `npx vercel login`, then `npx vercel link` (pick the project), then `npx vercel env pull .env.production.local --environment=production` (without `--environment` it pulls the empty Development set). That file is git-ignored; never commit or share it. Variables marked **Sensitive** in Vercel come down empty: paste those values into the file by hand.
+- [ ] First admin (you choose the password; Claude never sees it): `npx tsx --env-file=.env.production.local --conditions=react-server scripts/create-admin.ts <handle> "<Name>"`
+- [ ] Starter config (PRD categories + placeholder blocks/contacts/routing; skips fake emergency numbers; refuses if config already exists): `npx tsx --env-file=.env.production.local --conditions=react-server scripts/seed-dev.ts --real`
+- [ ] Then sign in at https://campusresolveiitk.vercel.app/admin/login and adjust blocks/contacts at `/admin/config`.
 
 ## Firebase — development project (Phase 0)
 
