@@ -1,6 +1,7 @@
 "use client";
 
-import { LogOut } from "lucide-react";
+import { BarChart3, ChevronRight, LogOut, Phone } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ChangePasswordForm } from "@/components/auth-forms";
@@ -10,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { api } from "@/lib/client/api";
-import { Panel } from "@/components/ui/surface";
+import { Panel, RuledList } from "@/components/ui/surface";
 import { useAuth } from "@/lib/client/auth";
 
 const ROLE_LABEL = { student: "Student", committee: "Hostel committee", admin: "Admin" };
@@ -26,6 +27,27 @@ export default function MorePage() {
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <h1 className="text-2xl font-bold">Your account</h1>
+      <nav aria-label="More pages">
+        <Panel>
+          <RuledList label="More pages">
+            {[
+              { href: "/stats", icon: BarChart3, label: "Hostel stats" },
+              { href: "/contacts", icon: Phone, label: "Contacts and emergency numbers" },
+            ].map((l) => (
+              <li
+                key={l.href}
+                className="relative flex items-center gap-3 px-4 py-3 hover:bg-paper"
+              >
+                <l.icon aria-hidden className="size-5 text-ink" />
+                <Link href={l.href} className="flex-1 font-semibold after:absolute after:inset-0">
+                  {l.label}
+                </Link>
+                <ChevronRight aria-hidden className="size-5 text-muted" />
+              </li>
+            ))}
+          </RuledList>
+        </Panel>
+      </nav>
       <Panel title="Profile">
         <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-3 px-4 pb-4">
           <dt className="text-muted">Name</dt>

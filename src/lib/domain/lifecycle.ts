@@ -156,6 +156,10 @@ export function applyAction<T>(c: ComplaintRecord<T>, a: WorkflowAction, ctx: Ct
         c.status === "resolved" || c.status === "closed",
         "Only resolved or closed complaints can be reopened.",
       );
+      need(
+        c.closureReason !== "duplicate",
+        "It was merged into another complaint. Reopen that one.",
+      );
       // A new handling cycle: nothing from the old resolution carries over (PRD §6.1).
       status = "reopened";
       patch = {

@@ -16,6 +16,7 @@ import {
 import { Inbox, Plus, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { FeedSummary } from "@/components/feed-summary";
 import { IssueRow } from "@/components/issue";
 import { Pseudonym } from "@/components/ui/badge";
 import { buttonClass, IconButton } from "@/components/ui/button";
@@ -176,6 +177,7 @@ export default function FeedPage() {
           </p>
         )}
       </header>
+      <FeedSummary />
 
       <form
         role="search"

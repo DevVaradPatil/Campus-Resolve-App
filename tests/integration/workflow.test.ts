@@ -3,6 +3,8 @@ import sharp from "sharp";
 import { beforeEach, describe, expect, it } from "vitest";
 import { GET as queueRoute } from "@/app/api/admin/complaints/route";
 import { GET as committeeRoute } from "@/app/api/committee/complaints/route";
+import { GET as exportRoute } from "@/app/api/admin/export/route";
+import { GET as dashboardRoute } from "@/app/api/dashboard/route";
 import { POST as actionRoute } from "@/app/api/complaints/[id]/actions/route";
 import { POST as hideCommentRoute } from "@/app/api/complaints/[id]/comments/[commentId]/hide/route";
 import { GET as commentsGet, POST as commentsPost } from "@/app/api/complaints/[id]/comments/route";
@@ -682,5 +684,89 @@ describe("duplicates (FR-08) and generic names", () => {
     expect((await act(adminToken, id, { type: "anonymize" })).status).toBe(200);
     expect((await pub(id))?.reporterLabel).toBe("A resident");
     expect((await act(adminToken, id, { type: "anonymize" })).status).toBe(409);
+  });
+});
+
+describe("dashboards (FR-14)", () => {
+  const dash = async (token: string) =>
+    (
+      await dashboardRoute(
+        await authedRequest(token, "http://localhost/api/dashboard?days=7"),
+        undefined as never,
+      )
+    ).json();
+
+  it("records stats in the same transactions and shapes the dashboard by role", async () => {
+    const a = await create(alice);
+    await create(bob, { visibility: "confidential", categoryId: "mess", subcategoryId: null });
+    await act(adminToken, a, { type: "assign", contactId: "maintenance" });
+    await act(adminToken, a, { type: "resolve", note: "Fixed it" });
+
+    const student = await dash(bob);
+    expect(student.hostel).toMatchObject({
+      created: 2,
+      byCategory: { infrastructure: 1, mess: 1 },
+      resolutionRate: { resolved: 1, eligible: 2, rate: 0.5 },
+      onTimeRate: { onTime: 1, total: 1 },
+    });
+    expect(student.mine).toMatchObject({ submitted: 1 });
+    expect(student.staff).toBeUndefined();
+    expect(student.committee).toBeUndefined();
+    expect(student.hostel.workload).toBeUndefined();
+
+    const staff = await dash(adminToken);
+    expect(staff.staff.live.byStatus).toMatchObject({ submitted: 1, resolved: 1 });
+    expect(staff.staff.workload).toEqual([
+      { name: "Hostel maintenance (dev placeholder)", assigned: 1, updates: 1 },
+    ]);
+    expect(staff.range.days).toBe(7);
+
+    const com = await dash(committee);
+    expect(com.committee.live.byStatus.submitted).toBe(0); // the open one is confidential
+    expect(com.staff).toBeUndefined();
+
+    for (const d of [student, staff, com])
+      expect(JSON.stringify(d)).not.toMatch(/Asha|Ravi|231001|214/);
+  });
+});
+
+describe("CSV export (FR-15)", () => {
+  const exportCsv = async (token: string, qs: string) =>
+    exportRoute(
+      await authedRequest(token, `http://localhost/api/admin/export?${qs}`),
+      undefined as never,
+    );
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date());
+  const range = `from=${today}&to=${today}`;
+
+  it("needs the export permission", async () => {
+    await create(alice);
+    expect((await exportCsv(alice, range)).status).toBe(403);
+    expect((await exportCsv(committee, range)).status).toBe(403);
+  });
+
+  it("exports allowlisted columns, leaves confidential rows out unless asked, and audits", async () => {
+    await create(alice, { title: '=HYPERLINK("http://evil","click")' });
+    await create(bob, { visibility: "confidential", title: "Private roommate matter" });
+    const res = await exportCsv(adminToken, range);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/csv");
+    const csv = await res.text();
+    const lines = csv.trim().split("\r\n");
+    expect(lines).toHaveLength(2); // header + the public complaint
+    expect(lines[0]).toContain("ticket_id,created_at_ist,title");
+    expect(lines[1]).toContain(`"'=HYPERLINK(`);
+    expect(csv).not.toMatch(/214|Asha|231001|leaking all night|Private roommate/);
+
+    const withConf = await (await exportCsv(adminToken, `${range}&confidential=1`)).text();
+    expect(withConf.trim().split("\r\n")).toHaveLength(3);
+    expect(withConf).toContain("Private roommate matter");
+    expect(withConf).not.toMatch(/214|Ravi|231002/);
+    expect(await audits()).toContain("export.csv");
+  });
+
+  it("rejects bad ranges", async () => {
+    expect((await exportCsv(adminToken, "from=2026-01-01&to=2027-06-01")).status).toBe(400);
+    expect((await exportCsv(adminToken, "from=yesterday&to=today")).status).toBe(400);
   });
 });

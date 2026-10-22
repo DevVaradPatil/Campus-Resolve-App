@@ -88,3 +88,16 @@ export async function uploadPhoto(
     xhr.send(form);
   });
 }
+
+/** Authenticated file download (e.g. CSV export): fetches with the ID token, then saves. */
+export async function apiDownload(path: string, filename: string) {
+  const token = await auth.currentUser?.getIdToken();
+  const res = await fetch(path, { headers: token ? { authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data.error ?? "Download failed.", data.fields);
+  }
+  const url = URL.createObjectURL(await res.blob());
+  Object.assign(document.createElement("a"), { href: url, download: filename }).click();
+  URL.revokeObjectURL(url);
+}

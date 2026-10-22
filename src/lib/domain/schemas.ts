@@ -236,3 +236,11 @@ export const reportInput = z.object({
 export type ReportInput = z.infer<typeof reportInput>;
 
 export const resolveReportInput = z.object({ action: z.enum(["keep", "hide"]) });
+
+const isoDay = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use a date like 2026-10-01.");
+/** GET /api/admin/export search params. */
+export const exportQuery = z.object({
+  from: isoDay,
+  to: isoDay,
+  confidential: z.preprocess((v) => v === "1", z.boolean()),
+});

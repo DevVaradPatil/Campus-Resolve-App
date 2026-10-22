@@ -3,6 +3,7 @@
 import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { CommitteeOverview } from "@/components/dashboard";
 import { IssueRow, QueueMeta } from "@/components/issue";
 import { EmptyState, ServiceUnavailable } from "@/components/ui/feedback";
 import { Skeleton } from "@/components/ui/spinner";
@@ -38,6 +39,7 @@ export default function CommitteePage() {
           .
         </p>
       </header>
+      <CommitteeOverview />
       {error && <ServiceUnavailable />}
       <Panel title="Overdue or escalated">
         {!items ? (

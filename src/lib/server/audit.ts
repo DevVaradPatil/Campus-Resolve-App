@@ -25,6 +25,7 @@ export type AuditAction =
   | "comment.hide"
   | "report.create"
   | "report.resolve"
+  | "export.csv"
   | `complaint.${WorkflowInput["type"] | "auto_close" | "reporter_view"}`
   | "attachment.upload";
 

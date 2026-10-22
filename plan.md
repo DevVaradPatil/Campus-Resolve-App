@@ -16,7 +16,7 @@ admin workflow & escalation → dashboards & notifications → hardening & recov
 | 3 | Complaint core: submit, route, upload, feed | ✅ Done on emulators (Supabase bucket check is in the Phase 0 spike) |
 | 4 | Workflow: assign, status, deadlines, escalate, resolve, close, reopen | ✅ Done (reminders/notifications move to Phase 5) |
 | 5 | Community & notifications | ✅ Done (follow-complaints skipped, optional) |
-| 6 | Dashboards, contacts, analytics, export | ⬜ Not started |
+| 6 | Dashboards, contacts, analytics, export | ✅ Done |
 | 7 | Hardening & recovery | ⬜ Not started |
 | 8 | Deploy & pilot | ⬜ Not started |
 
@@ -291,18 +291,24 @@ Tests
 
 **Goal:** useful, honest statistics without exposing individuals (PRD §7).
 
-- [ ] Stats aggregation: maintain `stats/{period}` counters (daily/weekly/monthly × category × block × status) updated in the same transactions as state changes. Dashboards read a handful of docs, not every complaint (quota, §8.3).
-- [ ] `analytics.ts` (pure, unit-tested) implementing the PRD §7.4 definitions exactly: resolution rate (cohort + period shown), on-time handling rate, median/average resolution time, overdue count, recurring-issue rate
-- [ ] Student dashboard: own summary, feed shortcuts, urgent issues, recent activity, quick create, contacts, hostel stats & category trends
-- [ ] Admin dashboard: status overview, overdue queue, category/location trends, handling/resolution times, deadline compliance, workload labelled "assignments recorded in system" (§7.2), duplicates/recurring, feedback, week/month comparison
-- [ ] Committee dashboard: public states, overdue/escalated, moderation queue, trends, escalation outcomes
-- [ ] Every chart shows its counts and date range, and no aggregate drills down to a reporter
-- [ ] Contact directory page (searchable) + emergency contacts block
-- [ ] CSV export (admin, permission-gated): column allowlist that excludes confidential fields unless explicitly authorized, audited (FR-15). Escape cells against formula injection.
+- [x] Stats aggregation: one doc per IST calendar day, `stats/{YYYY-MM-DD}`. Pure `statsDelta()` (`src/lib/domain/stats.ts`) says which counters move; `writeStats()` applies them **in the same transaction** as the change (creation, every lifecycle transition, feedback). Counters: created (by category, block, priority), cohort eligible/resolved (on the creation day), first action on time/late, resolved + per-complaint resolution hours (keyed by complaint id, so a re-resolution replaces), reopened, closed by reason, escalations raised/resolved, duplicates, feedback, recorded workload per contact. Dashboards read ≤ 180 small docs (90 days + the previous 90). *Changed from plan:* daily docs only, no weekly/monthly copies; ranges are 7/30/90 days with the previous period for comparison. Stats start from this deploy; earlier complaints aren't backfilled.
+- [x] `analytics.ts` (pure, fixture-tested) per PRD §7.4: resolution rate per creation cohort (merged duplicates excluded), on-time handling rate (first documented action within target), median and average resolution time (submission → recorded resolution), overdue count (live), recurring-issue rate (linked duplicates ÷ complaints in the period). Every rate carries its "n of N".
+- [x] Live state from Firestore `count()` queries (open by status, overdue, escalated, open reports), never a scan
+- [x] `GET /api/dashboard?days=7|30|90`, shaped by role: residents get hostel aggregates + their own counts; staff (`complaints.manage`) add live counts, previous period, closures, reopened, escalations, feedback, workload; committee adds public-only live counts and escalation outcomes. Nothing identifies a reporter (tested).
+- [x] Student view: feed top strip with own counts (the "needs your reply" count is the screen's Highlight), "Urgent right now" (open critical public complaints), links to `/stats` and `/contacts`. `/stats` page: KPI tiles + category/block bars for any range.
+- [x] Admin dashboard on `/admin`: overdue, escalated, reopened, feedback tiles; open by status; closures by reason; workload table labelled "Assignments recorded in the system" with the PRD §7.2 caveat; hostel trends with change vs previous period
+- [x] Committee view on `/committee`: public overdue/escalated/open-report counts, escalated complaints resolved vs escalations raised, hostel trends
+- [x] Every block names its date range; stat tiles show counts beside rates; bars are one hue with direct counts (dataviz rules), and the list doubles as the table view
+- [x] Contact directory `/contacts` (`GET /api/contacts`, active contacts only), searchable, with the emergency notice on top; linked from the feed and `/more`
+- [x] CSV export `GET /api/admin/export?from&to[&confidential=1]` (permission `export`): fixed column allowlist (never reporter identity, room, location note, description, comments, photos, internal notes), confidential rows only with `confidential.view` **and** an explicit opt-in, formula-injection escaping (`csvCell`), ≤ 2,000 rows and ≤ 1 year, UTF-8 BOM for Excel, audited (`export.csv`). Panel on `/admin`.
+- [x] Lifecycle fix found while modelling cohorts: a complaint closed as a merged duplicate can no longer be reopened (reopen the primary instead)
 
-Tests: FR-14, FR-15, plus analytics unit tests with fixed fixtures.
+Tests
+- [x] Unit: `analytics.test.ts` drives three complaints through the real lifecycle into day docs and checks every §7.4 figure, IST day boundaries, ranges, median, divide-by-zero; `csv.test.ts` formula defusing and quoting
+- [x] Integration (FR-14): stats written in the same transactions; dashboard sections by role; committee live counts exclude confidential; no reporter data in any dashboard. (FR-15): export needs `export`; allowlisted columns; confidential rows only on request; formula escaped; no identity/room/description; audited; bad ranges rejected
+- [x] Browser check (emulators): feed strip with highlighted "needs your reply" + urgent critical issue; `/stats`; admin overview (live counts, workload, trends with change); CSV export with and without confidential rows, no leaks; `/contacts`
 
-**Exit:** dashboards match fixture expectations, and exports respect permissions.
+**Exit:** ✅ dashboards match fixture expectations, and exports respect permissions.
 
 ---
 
@@ -374,6 +380,7 @@ Email/WhatsApp/SMS, PWA install, maps, staff accounts, multi-hostel, institution
 ## Change log
 
 - 2026-10-21: Plan created from PRD v1.0.
+- 2026-10-22: Phase 6 landed: daily stats counters, §7.4 analytics, role-shaped dashboards, contact directory, CSV export.
 - 2026-10-22: Phase 5 slice 3: reports + moderation queue, duplicate merge, generic reporter name. Phase 5 done.
 - 2026-10-22: Phase 5 slice 2: support votes and comments with moderation.
 - 2026-10-22: Phase 5 slice 1: in-app notifications (transactional, deduped, confidential-safe), notification centre, mute preference, pre-closure reminder.

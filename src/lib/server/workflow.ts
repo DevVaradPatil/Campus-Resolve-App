@@ -8,6 +8,7 @@ import {
   type WorkflowAction,
 } from "@/lib/domain/lifecycle";
 import { notificationsFor } from "@/lib/domain/notifications";
+import { statsDelta } from "@/lib/domain/stats";
 import { can } from "@/lib/domain/permissions";
 import type { WorkflowInput } from "@/lib/domain/schemas";
 import { writeAudit, type AuditAction } from "./audit";
@@ -17,9 +18,11 @@ import { loadConfig, type HostelConfig } from "./config";
 import { adminDb } from "./firebase-admin";
 import { forbidden, HttpError } from "./http";
 import { adminUids, writeNotifications } from "./notify";
+import { writeStats } from "./stats";
 import type { ComplaintDoc } from "./types";
 
 const db = adminDb;
+const toMs = (t: Timestamp) => t.toMillis();
 export const clock = (now = Date.now()) => ({
   now,
   ts: Timestamp.fromMillis,
@@ -93,6 +96,10 @@ export function writeTransition(
     meta: { ticketId: c.ticketId, from: c.status, to: patch.status ?? c.status },
   });
   const next = { ...c, ...patch } as ComplaintDoc;
+  writeStats(
+    tx,
+    statsDelta(id, c, next, event.type, (patch.updatedAt as Timestamp).toMillis(), toMs),
+  );
   writeNotifications(
     tx,
     id,
@@ -124,7 +131,9 @@ export async function act(user: SessionUser, id: string, input: WorkflowInput) {
       if (c.status !== "closed" || c.feedback)
         throw new HttpError(409, "Feedback is for closed complaints, once.");
       // Private to the reporter and admins; never on the public record.
-      tx.update(ref, { feedback: { rating: input.rating, comment: input.comment } });
+      const feedback = { rating: input.rating, comment: input.comment };
+      tx.update(ref, { feedback });
+      writeStats(tx, statsDelta(id, c, { ...c, feedback }, "feedback", Date.now(), toMs));
       writeAudit(tx, {
         actorUid: user.uid,
         action: "complaint.feedback",

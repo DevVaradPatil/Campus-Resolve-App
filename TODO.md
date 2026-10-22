@@ -51,7 +51,7 @@ Not needed for local emulator work, which uses built-in dev values. Required for
 Generate each with `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"` (32+ characters):
 - [x] `ACTIVATION_CODE_PEPPER`: HMAC key for hashing activation codes. Changing it later invalidates every unused code.
 - [x] `RATE_LIMIT_IP_SALT`: HMAC key for hashing IPs in rate-limit keys
-- [ ] `CRON_SECRET`: shared secret for the sweep endpoint (also add it as a GitHub Actions secret in Phase 4)
+- [x] `CRON_SECRET`: shared secret for the sweep endpoint (also add it as a GitHub Actions secret in Phase 4)
 - [x] Decide who the **first admin** is. For a real project, run this yourself with the real project's env file (Claude never sees the password):
   `npx tsx --env-file=.env.production.local --conditions=react-server scripts/create-admin.ts <handle> "<Name>"`
   Use a password you don't use anywhere else. Admins sign in at `/admin/login` with just the handle.
@@ -72,8 +72,8 @@ Generate each with `node -e "console.log(require('crypto').randomBytes(32).toStr
 
 ## Phase 4 — Scheduler
 
-- [ ] Generate a `CRON_SECRET` (same command as the other secrets) and add it to **Vercel** env vars, then redeploy
-- [ ] GitHub repo → Settings → Secrets and variables → Actions: add `CRON_SECRET` (same value) and `SWEEP_URL` = `https://campusresolveiitk.vercel.app/api/cron/sweep`. Then Actions → Sweep → **Run workflow** once to check it goes green.
+- [x] Generate a `CRON_SECRET` (same command as the other secrets) and add it to **Vercel** env vars, then redeploy
+- [x] GitHub repo → Settings → Secrets and variables → Actions: add `CRON_SECRET` (same value) and `SWEEP_URL` = `https://campusresolveiitk.vercel.app/api/cron/sweep`. Then Actions → Sweep → **Run workflow** once to check it goes green.
 - [x] ~~Redeploy the Firestore indexes~~ (deployed 2026-10-22). Rerun `npx firebase deploy --only firestore --project dev` whenever `firestore.indexes.json` or `firestore.rules` change.
 - [ ] Test complaints made before Phase 4 don't appear in the admin queue. Delete them in the Firebase console (`complaints` and `publicComplaints`) or just make new ones.
 

@@ -17,6 +17,7 @@ import {
 import { can } from "@/lib/domain/permissions";
 import { isOverdue } from "@/lib/domain/lifecycle";
 import { notificationsFor } from "@/lib/domain/notifications";
+import { statsDelta } from "@/lib/domain/stats";
 import type { CreateComplaintInput, WorkflowInput } from "@/lib/domain/schemas";
 import { writeAudit } from "./audit";
 import type { SessionUser } from "./auth";
@@ -27,6 +28,7 @@ import { reencodeImage } from "./images";
 import { consume, LIMITS } from "./rate-limit";
 import { deleteObject, putObject, signedUrl } from "./storage";
 import { adminUids, writeNotifications } from "./notify";
+import { writeStats } from "./stats";
 import { canSupport } from "./community";
 import { availableActions } from "./workflow";
 import type { AttachmentDoc, ComplaintDoc, EventDoc } from "./types";
@@ -134,6 +136,10 @@ export async function createComplaint(user: SessionUser, input: CreateComplaintI
       tx,
       id,
       notificationsFor("created", record, { actorUid: user.uid, adminUids: admins, critical }),
+    );
+    writeStats(
+      tx,
+      statsDelta(id, null, record, "created", nowMs, () => nowMs),
     );
     writeAudit(tx, {
       actorUid: user.uid,

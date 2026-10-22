@@ -1,5 +1,6 @@
 import { ChevronRight, Flag, Inbox, Settings2, Users } from "lucide-react";
 import Link from "next/link";
+import { AdminDashboard, ExportPanel } from "@/components/admin-dashboard";
 import { Panel, RuledList } from "@/components/ui/surface";
 
 export const metadata = { title: "Admin · CampusResolve" };
@@ -33,8 +34,9 @@ const SECTIONS = [
 
 export default function AdminHome() {
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6">
+    <div className="mx-auto flex max-w-4xl flex-col gap-6">
       <h1 className="text-2xl font-bold">Admin</h1>
+      <AdminDashboard />
       <Panel>
         <RuledList label="Admin sections">
           {SECTIONS.map((s) => (
@@ -51,6 +53,7 @@ export default function AdminHome() {
           ))}
         </RuledList>
       </Panel>
+      <ExportPanel />
     </div>
   );
 }
