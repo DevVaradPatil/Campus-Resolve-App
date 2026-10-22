@@ -1,5 +1,6 @@
 import "server-only";
 import { createHmac } from "node:crypto";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { safeEqual } from "./crypto";
@@ -68,6 +69,19 @@ export async function deleteObject(key: string) {
       body: JSON.stringify({ prefixes: [key] }),
     });
   else await rm(local(key), { force: true });
+}
+
+/** For backup reconciliation (FR-16): is the object still in storage? */
+export async function objectExists(key: string) {
+  checkKey(key);
+  if (!supabase) return existsSync(local(key));
+  const slash = key.lastIndexOf("/");
+  const res = await storageApi(`object/list/${env.SUPABASE_BUCKET}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ prefix: key.slice(0, slash), search: key.slice(slash + 1), limit: 1 }),
+  });
+  return ((await res.json()) as unknown[]).length > 0;
 }
 
 /** Cheap authenticated call so the free Supabase project never counts as idle (D2). */

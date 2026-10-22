@@ -1,6 +1,14 @@
 "use client";
 
-import { BarChart3, ChevronRight, LogOut, Phone } from "lucide-react";
+import {
+  BarChart3,
+  ChevronRight,
+  Info,
+  LogOut,
+  Phone,
+  ScrollText,
+  ShieldCheck,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -33,6 +41,9 @@ export default function MorePage() {
             {[
               { href: "/stats", icon: BarChart3, label: "Hostel stats" },
               { href: "/contacts", icon: Phone, label: "Contacts and emergency numbers" },
+              { href: "/about", icon: Info, label: "About this pilot" },
+              { href: "/privacy", icon: ShieldCheck, label: "Privacy notice" },
+              { href: "/rules", icon: ScrollText, label: "Community rules" },
             ].map((l) => (
               <li
                 key={l.href}

@@ -111,6 +111,7 @@ export default function QueuePage() {
       </div>
     ) : (
       <>
+        <h2 className="sr-only">Complaints in this view</h2>
         <RuledList label="Complaints">
           {page.items.map((i) => (
             <IssueRow

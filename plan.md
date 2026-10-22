@@ -17,7 +17,7 @@ admin workflow & escalation → dashboards & notifications → hardening & recov
 | 4 | Workflow: assign, status, deadlines, escalate, resolve, close, reopen | ✅ Done (reminders/notifications move to Phase 5) |
 | 5 | Community & notifications | ✅ Done (follow-complaints skipped, optional) |
 | 6 | Dashboards, contacts, analytics, export | ✅ Done |
-| 7 | Hardening & recovery | ⬜ Not started |
+| 7 | Hardening & recovery | 🟨 Done except App Check + real restore test (owner keys) |
 | 8 | Deploy & pilot | ⬜ Not started |
 
 Legend: ⬜ not started · 🟨 in progress · ✅ done (exit criteria met)
@@ -317,30 +317,31 @@ Tests
 **Goal:** security, recovery and operational acceptance (PRD §12, §14, §15.2, §15.4).
 
 Security
-- [ ] Audit coverage review against the PRD §14.1 list. Add a test per admin action asserting an audit doc exists.
-- [ ] Rate limits on every mutating route, confirmed with tests
-- [ ] Security headers: CSP (nonce-based, image hosts allowlisted), HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `frame-ancestors 'none'`
-- [ ] CORS: same-origin only for `/api/*`
-- [ ] App Check (reCAPTCHA v3 provider) enforced on API routes as a supplementary signal
-- [ ] Error handling: generic client messages, structured server logs with secrets/PII redacted, Sentry free tier (optional) with PII scrubbing
-- [ ] Dependency audit (`npm audit`), secret scan in CI
-- [ ] Full security acceptance suite (PRD §15.2), automated where possible
+- [x] Audit coverage: every state change writes `writeAudit()` in its transaction (accounts, roster, config, complaints, photos, comments, reports, moderation, export, preferences, retention). New test drives every staff/committee workflow action and asserts an audit doc with actor, target and no note text; earlier suites cover roster, config, export, reporter lookups, moderation and comment hides.
+- [x] Rate limits: login, activation, password change, complaint submit (5/h), uploads (10/h, now tested), support (30/10 min), comments (10/10 min), reports (10/h). Not limited on purpose: admin-only actions (behind `requireUser` + permission) and one-shot reporter actions (confirm, reopen, feedback), which the lifecycle allows once per state.
+- [x] Security headers in `next.config.ts`: CSP, HSTS, `nosniff`, `Referrer-Policy: same-origin` (complaint ids are in URLs), `X-Frame-Options: DENY` + `frame-ancestors 'none'` (confirmed: the app can't even frame itself), `Permissions-Policy`, COOP. *Changed from plan:* **static CSP, not nonce-based.** Nonces need every page rendered per request; pages are static client shells and user content is always rendered as text. `script-src 'self' 'unsafe-inline'` (no `unsafe-eval` in production), `connect-src` limited to Firebase Auth/Firestore (+ emulators locally), `img-src` adds the Supabase host when configured. Upgrade path: `proxy.ts` nonces. Checked against a production build: sign-in and every screen work, no CSP errors.
+- [x] CORS: API routes send no `Access-Control-Allow-*` headers, so browsers block cross-origin reads; auth is a Bearer token, never a cookie, so there's no CSRF surface.
+- [ ] App Check (reCAPTCHA v3): **blocked** on the owner's reCAPTCHA key (TODO.md)
+- [x] Error handling: `route()` returns a generic 500 and logs server-side only (test asserts no message or stack reaches the client). Sentry is optional and waits on the owner's choice.
+- [x] CI: `npm audit --omit=dev --audit-level=high` and a gitleaks secret scan over full history. Local history scan clean.
+- [x] Security acceptance (PRD §15.2), automated: cross-account access by URL/id (Phase 3), role/owner/priority/assignment manipulation (Phase 4), committee without confidential access (Phases 4-6), expired/consumed codes (Phase 2), login and **upload** rate limits, malformed uploads (Phase 3), **expired/forged photo links refused** (no permanent URLs), admin actions audited, **errors don't leak**, deactivation (Phase 2)
 
 Retention
-- [ ] `retention.ts` + sweep step: delete or anonymize complaints 365 days after closure/last activity, including their attachments in storage. Audit logs pruned at 365 days. Rate-limit docs expire quickly (Firestore TTL policy on `expiresAt`, which works on Spark; verify).
+- [x] `retention.ts`, run by the sweep: deletes complaints closed more than 365 days ago with their photos (storage first), comments, votes, events, attachment docs, public copy, notifications and reports, audited per complaint; prunes audit logs older than 365 days; prunes expired rate-limit counters every run (fallback if no TTL policy). Bounded (10 complaints, 200 logs per run). **Off until `RETENTION_ENABLED=true`** because the policy awaits owner approval. `retentionHold: true` on a complaint is the documented preservation exception. Only closed complaints are deleted, never open ones. Aggregate stats are kept (counts only).
 
-Backup & recovery (zero-paid fallback, §14.3)
-- [ ] `scripts/export-backup.ts`: dump the authorized collections + attachment manifest → JSON → encrypt with `age` (public key in repo, private key offline) → write locally
-- [ ] `scripts/restore-backup.ts`: decrypt → load into a separate Firebase project/emulator → verify counts → reconcile attachment manifest against storage (FR-16)
-- [ ] `docs/RECOVERY.md`: step-by-step restore + role verification
-- [ ] Perform and log a real restoration test
+Backup & recovery (zero-paid, §14.3)
+- [x] `backup.ts` + `scripts/export-backup.ts`: dumps users, accounts, roster, complaints (with all sub-collections), public copies, reports, audit logs, hostel setup, settings and stats, plus a photo manifest; timestamps preserved; encrypted with age (`age-encryption`, pure JS, standard format the `age` CLI can read) to the owner's **public** key
+- [x] `scripts/restore-backup.ts`: decrypts, refuses a non-empty target, restores in batches, verifies every collection's count, reconciles the photo manifest against storage (FR-16)
+- [x] `docs/RECOVERY.md`: key setup, backup and restore steps, access check, production disaster path, restore log
+- [x] Restore test on the emulators: automated FR-16 test (encrypt, wipe, restore, then counts, timestamps, comments, photo reconciliation incl. a deliberately missing photo) and a script run end to end. Logged in RECOVERY.md.
+- [ ] Restore test against the real `campusresolve-restore-test` project: **blocked** on the owner's age key and that project (TODO.md)
 
 Ops docs
-- [ ] `docs/OPERATIONS.md`: quota/usage checks (Firebase, storage, host), admin onboarding/offboarding, account revocation, incident & defect reporting
-- [ ] Privacy notice + acceptable-use pages in the app (content approved by owner, see TODO.md)
-- [ ] Mobile + accessibility pass (Lighthouse/axe on key screens, real phone check)
+- [x] `docs/OPERATIONS.md`: who watches what, the sweep, weekly quota checks, admin and student lifecycle, deploys, retention switch, incidents (exposure, misuse, leaked keys, data loss), bug reports
+- [x] `/about` (fixes the pilot notice's dead link), `/privacy`, `/rules`: public pages, linked from sign-in and the account page. Privacy and rules are **drafts** marked for owner approval (TODO.md).
+- [x] Accessibility pass: axe (WCAG 2.1 A/AA + best practice) on every screen, signed in as student and admin, at 375px. Fixed: pilot notice outside a landmark (now an `<aside>`), heading-order gaps on `/mine` and the admin queue. No horizontal scrolling at phone width. Real-phone check is a pilot task.
 
-**Exit (PRD Phase 4):** security, recovery and operational acceptance criteria pass.
+**Exit (PRD Phase 4):** partly met: security, recovery and operational criteria pass on the emulators and the dev deploy. Remaining: App Check and a restore into the real restore-test project, both waiting on owner keys.
 
 ---
 
@@ -380,6 +381,7 @@ Email/WhatsApp/SMS, PWA install, maps, staff accounts, multi-hostel, institution
 ## Change log
 
 - 2026-10-21: Plan created from PRD v1.0.
+- 2026-10-22: Phase 7: security headers (static CSP), CI audit + secret scan, retention (off until approved), encrypted backup/restore with FR-16 test, about/privacy/rules pages, ops and recovery docs, axe pass.
 - 2026-10-22: Phase 6 landed: daily stats counters, §7.4 analytics, role-shaped dashboards, contact directory, CSV export.
 - 2026-10-22: Phase 5 slice 3: reports + moderation queue, duplicate merge, generic reporter name. Phase 5 done.
 - 2026-10-22: Phase 5 slice 2: support votes and comments with moderation.

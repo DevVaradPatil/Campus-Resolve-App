@@ -66,6 +66,7 @@ export default function MinePage() {
           </div>
         ) : (
           <>
+            <h2 className="sr-only">Your complaints, newest first</h2>
             <RuledList label="My complaints">
               {page.items.map((i) => (
                 <IssueRow key={i.id} issue={i} href={`/complaints/${i.id}`} />

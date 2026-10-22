@@ -58,3 +58,6 @@ service-account*.json
 
 .vercel
 .env*
+
+# encrypted backups (keep off the repo; copy to offline storage)
+/backups/

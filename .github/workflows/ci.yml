@@ -18,6 +18,8 @@ jobs:
           distribution: temurin
           java-version: 21
       - run: npm ci
+      # Known vulnerabilities in what ships to production (dev tooling excluded).
+      - run: npm audit --omit=dev --audit-level=high
       - run: npm run lint
       - run: npx prettier --check .
       - run: npm run typecheck
@@ -27,3 +29,14 @@ jobs:
         env:
           NEXT_PUBLIC_USE_EMULATORS: "true"
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-campusresolve
+
+  secrets:
+    # Fails the build if a key, token or private key lands in the repo history.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

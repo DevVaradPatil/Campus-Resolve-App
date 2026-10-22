@@ -5,6 +5,7 @@ import { notificationsFor } from "@/lib/domain/notifications";
 import type { AuditAction } from "./audit";
 import { adminDb } from "./firebase-admin";
 import { adminUids, notifyOnce } from "./notify";
+import { runRetention } from "./retention";
 import { ping } from "./storage";
 import type { ComplaintDoc } from "./types";
 import { clock, writeTransition } from "./workflow";
@@ -102,12 +103,15 @@ export async function sweep(now = Date.now()) {
     (e) => (console.error("Storage keep-alive failed", e), "failed"),
   );
 
-  await STATE.set({ lastRunAt: due, escalated, closed, reminded, storage });
+  const retention = await runRetention(now);
+
+  await STATE.set({ lastRunAt: due, escalated, closed, reminded, storage, retention });
   return {
     escalated,
     closed,
     reminded,
     storage,
+    retention,
     more: overdue.size === BATCH || expired.size === BATCH || closingSoon.size === BATCH,
   };
 }

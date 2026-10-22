@@ -1,4 +1,5 @@
 import { ClipboardCheck } from "lucide-react";
+import Link from "next/link";
 import { PilotNotice } from "@/components/notices";
 
 export default function AuthLayout({ children }: LayoutProps<"/">) {
@@ -12,6 +13,17 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
             CampusResolve
           </p>
           {children}
+          <nav aria-label="About this pilot" className="mt-10 flex flex-wrap gap-x-5 text-sm">
+            <Link href="/about" className="inline-flex min-h-11 items-center text-ink underline">
+              About
+            </Link>
+            <Link href="/privacy" className="inline-flex min-h-11 items-center text-ink underline">
+              Privacy
+            </Link>
+            <Link href="/rules" className="inline-flex min-h-11 items-center text-ink underline">
+              Community rules
+            </Link>
+          </nav>
         </div>
       </main>
     </div>

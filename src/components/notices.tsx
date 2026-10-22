@@ -7,12 +7,15 @@ import { formatDateTime } from "@/lib/format";
 /** Always-visible strip. The app must never look like an official IIT Kanpur channel (PRD §1). */
 export function PilotNotice() {
   return (
-    <p className="border-b border-rule bg-sheet-sunk px-4 py-1.5 text-center text-xs text-muted">
+    <aside
+      aria-label="Pilot notice"
+      className="border-b border-rule bg-sheet-sunk px-4 py-1.5 text-center text-xs text-muted"
+    >
       Student-led pilot, not an official IIT Kanpur channel.{" "}
       <Link href="/about" className="text-ink underline underline-offset-2">
         About this pilot
       </Link>
-    </p>
+    </aside>
   );
 }
 

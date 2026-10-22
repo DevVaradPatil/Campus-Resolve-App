@@ -25,6 +25,8 @@ const schema = z
     FIREBASE_PRIVATE_KEY: optional,
     ACTIVATION_CODE_PEPPER: secret,
     RATE_LIMIT_IP_SALT: secret,
+    // PRD §14.2 deletion after a year. Stays off until the owner approves the policy (TODO.md).
+    RETENTION_ENABLED: z.preprocess(blank, z.stringbool().default(false)),
     // Shared secret for POST /api/cron/sweep (D3). Unset → the endpoint refuses every call.
     CRON_SECRET: secret,
     // Photo storage (plan.md D2). Unset → local disk, emulators only.

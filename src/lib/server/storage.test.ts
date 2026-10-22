@@ -59,3 +59,23 @@ describe("Supabase storage backend", () => {
     await expect(storage.putObject(KEY, Buffer.from("img"))).rejects.toThrow(/500/);
   });
 });
+
+describe("local signed URLs (PRD §15.2: no permanent image URLs)", () => {
+  it("refuses expired and tampered links", async () => {
+    vi.resetModules();
+    const storage = await import("./storage");
+    const url = new URL(await storage.signedUrl("complaints/abc/def.webp"), "http://localhost");
+    const key = "complaints/abc/def.webp";
+    const sig = url.searchParams.get("sig");
+    const past = String(Date.now() - 1000);
+    await expect(storage.readSigned(key, past, sig)).rejects.toMatchObject({ status: 403 });
+    await expect(
+      storage.readSigned(key, url.searchParams.get("exp"), "forged"),
+    ).rejects.toMatchObject({
+      status: 403,
+    });
+    await expect(storage.readSigned(key, url.searchParams.get("exp"), null)).rejects.toMatchObject({
+      status: 403,
+    });
+  });
+});

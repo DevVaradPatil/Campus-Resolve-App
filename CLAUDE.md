@@ -20,6 +20,8 @@ npm test               # Vitest unit tests under src/ (no emulators)
 npm run test:emu       # tests/ (rules + integration, serial); starts its own emulators, so stop `npm run emulators` first (port clash)
 npm run create-admin -- <handle> "<Name>"   # admin-namespace account in whatever .env.local points at (hidden password prompt)
 npm run seed-dev       # PRD default categories + placeholder blocks/contacts/routing into the running emulators
+npx tsx --env-file=<env> --conditions=react-server scripts/export-backup.ts <age1 public key>    # encrypted backup (docs/RECOVERY.md)
+npx tsx --env-file=<env> --conditions=react-server scripts/restore-backup.ts <file.age> <key>   # restore into an EMPTY project
 npx vitest run src/lib/domain/lifecycle.test.ts -t "reopen"   # single unit test
 npx firebase emulators:exec --only auth,firestore --project demo-campusresolve "npx vitest run tests/rules/deny-all.test.ts"   # single emulator test
 ```
@@ -27,6 +29,8 @@ npx firebase emulators:exec --only auth,firestore --project demo-campusresolve "
 - Next.js is **16.4**. Read `AGENTS.md` and the bundled docs in `node_modules/next/dist/docs/` before using Next APIs, because they differ from older versions (e.g. `proxy` instead of `middleware`, `cacheComponents` is on).
 - Vitest aliases `server-only` to an empty module (`vitest.config.mts`), so tests can import `src/lib/server/*` directly. Integration tests call `src/lib/server/accounts.ts` functions and route handlers (`POST(new Request(...))`) directly. `tests/integration/helpers.ts` wipes both emulators per test and makes Bearer requests.
 - Scripts in `scripts/` run with `tsx --conditions=react-server` (that condition makes `server-only` importable outside Next).
+- `next build`/`next start` also load `.env.production.local` (the real dev project). To run a production build against the emulators, set `FIREBASE_PROJECT_ID` and `NEXT_PUBLIC_FIREBASE_PROJECT_ID` to `demo-campusresolve` (and `NEXT_PUBLIC_USE_EMULATORS=true`) in the process env.
+- Security headers and the CSP live in `next.config.ts`. A new external host (images, API) must be added to the CSP there.
 - On this Windows machine the dev server sometimes misses file writes made by shell scripts. If a change doesn't show up (stale CSS, an old error overlay), restart the dev server before debugging further.
 
 ## Architecture invariants
@@ -41,7 +45,7 @@ Stack: Next.js App Router + TypeScript (strict), Tailwind, Firebase Auth (custom
 - **Auth:** login and activation responses must not reveal whether a roll number exists (same message, and unknown accounts still pay the scrypt cost). Passwords are scrypt-hashed in `accounts/{loginId}`, kept apart from the `users/{uid}` profile. Activation codes are stored as HMACs, and both routes are rate-limited per account and per hashed IP. Students' `loginId` is the roll number. Admins use `admin:<handle>` (separate credentials, never a student account). Reissuing a code for an activated student *is* the password reset.
 - **Sessions:** the Firebase client SDK holds the session, and the client sends `Authorization: Bearer <ID token>` via `api()` in `src/lib/client/api.ts`. Signed-in screens are client components behind `RequireAuth`. Never put authenticated data in server-rendered output. Every account change that should end sessions calls `revokeSessions()`.
 - **Audit:** every state-changing server function writes `writeAudit()` in the same transaction/batch. Audit meta never contains passwords, codes, tokens or complaint bodies.
-- **Scheduled work** (deadline escalation, reminders, auto-close) runs in the secret-protected `POST /api/cron/sweep`, triggered by GitHub Actions. It must be idempotent and bounded.
+- **Scheduled work** (deadline escalation, reminders, auto-close, retention when `RETENTION_ENABLED`) runs in the secret-protected `POST /api/cron/sweep`, triggered by GitHub Actions. It must be idempotent and bounded.
 - **Uploads:** all object storage goes through `src/lib/server/storage.ts` (Supabase Storage via REST when `SUPABASE_URL`/`SUPABASE_SECRET_KEY` are set, otherwise a local-disk backend under `.data/uploads` that only works with the emulators). Check magic bytes (JPEG/PNG/WebP only), re-encode with `sharp` to strip EXIF, use server-generated object keys, and serve private images only via short-lived signed URLs.
 - **Quota-aware:** paginate everything (≤20 per page), keep listeners scoped to visible records, and read dashboards from pre-aggregated `stats` docs. On failure, surface a clear error and never drop a submission.
 

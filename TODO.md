@@ -81,7 +81,10 @@ Generate each with `node -e "console.log(require('crypto').randomBytes(32).toStr
 
 - [ ] Register a **reCAPTCHA v3** site for App Check (free) → `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`, and enable App Check in the Firebase console
 - [ ] Optional: free **Sentry** account → `SENTRY_DSN` (skip if you'd rather not send error data to a third party)
-- [ ] Install `age` and generate the backup keypair (`age-keygen -o backup.key`). Give Claude **only the public key**. Keep `backup.key` offline (e.g. a password manager or USB), never in the repo.
+- [ ] Install `age` and generate the backup keypair (`age-keygen -o backup.key`). Give Claude **only the public key**. Keep `backup.key` offline (e.g. a password manager or USB), never in the repo. Then take backups weekly as in [docs/RECOVERY.md](docs/RECOVERY.md).
+- [ ] Do one real restore test into `campusresolve-restore-test` following docs/RECOVERY.md, and log it there.
+- [ ] Once the one-year retention policy is approved: set `RETENTION_ENABLED=true` in Vercel and redeploy (docs/OPERATIONS.md, Retention).
+- [ ] Review the drafts at `/privacy` and `/rules` (and `/about`); tell Claude what to change, or approve them so the "Draft" banners come off.
 - [ ] Create a second Firebase project `campusresolve-restore-test` (Spark) to restore backups into
 
 ## Phase 8 — Production

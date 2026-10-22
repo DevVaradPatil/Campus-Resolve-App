@@ -1,4 +1,7 @@
+import { existsSync, rmSync } from "node:fs";
+import path from "node:path";
 import { Timestamp } from "firebase-admin/firestore";
+import { Decrypter, Encrypter, generateX25519Identity, identityToRecipient } from "age-encryption";
 import sharp from "sharp";
 import { beforeEach, describe, expect, it } from "vitest";
 import { GET as queueRoute } from "@/app/api/admin/complaints/route";
@@ -24,6 +27,8 @@ import { activate, importRoster, issueCodes, login, setRole } from "@/lib/server
 import type { SessionUser } from "@/lib/server/auth";
 import { seedConfig } from "@/lib/server/config";
 import { adminDb } from "@/lib/server/firebase-admin";
+import { exportBackup, restoreBackup } from "@/lib/server/backup";
+import { runRetention } from "@/lib/server/retention";
 import { sweep } from "@/lib/server/sweep";
 import { ADMIN_PASSWORD, authedRequest, resetEmulators, ROSTER_CSV, seedAdmin } from "./helpers";
 
@@ -768,5 +773,179 @@ describe("CSV export (FR-15)", () => {
   it("rejects bad ranges", async () => {
     expect((await exportCsv(adminToken, "from=2026-01-01&to=2027-06-01")).status).toBe(400);
     expect((await exportCsv(adminToken, "from=yesterday&to=today")).status).toBe(400);
+  });
+});
+
+describe("retention (PRD §14.2)", () => {
+  const DAY = 86_400_000;
+  async function closedComplaint(daysAgo: number, extra: Record<string, unknown> = {}) {
+    const id = await create(alice);
+    await act(adminToken, id, { type: "assign", contactId: "maintenance" });
+    await act(adminToken, id, { type: "resolve", note: "Fixed it" });
+    await act(alice, id, { type: "confirm" });
+    await adminDb
+      .doc(`complaints/${id}`)
+      .update({ closedAt: Timestamp.fromMillis(Date.now() - daysAgo * DAY), ...extra });
+    return id;
+  }
+
+  it("does nothing to complaints while switched off", async () => {
+    const old = await closedComplaint(400);
+    expect(await runRetention(Date.now(), false)).toMatchObject({ enabled: false, complaints: 0 });
+    expect((await adminDb.doc(`complaints/${old}`).get()).exists).toBe(true);
+  });
+
+  it("deletes year-old closed complaints with everything attached, and keeps the rest", async () => {
+    const old = await closedComplaint(400);
+    const recent = await closedComplaint(30);
+    const held = await closedComplaint(400, { retentionHold: true });
+    // Things hanging off the old complaint.
+    const img = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#888" } })
+      .jpeg()
+      .toBuffer();
+    const form = new FormData();
+    form.append("photo", new File([new Uint8Array(img)], "p.jpg", { type: "image/jpeg" }));
+    await photoRoute(
+      await authedRequest(alice, "http://localhost/api/x", { method: "POST", body: form }),
+      { params: Promise.resolve({ id: old }) },
+    );
+    const key = (await adminDb.collection(`complaints/${old}/attachments`).get()).docs[0].get(
+      "key",
+    );
+    const file = path.join(process.cwd(), ".data", "uploads", ...key.split("/"));
+    await commentsPost(
+      await authedRequest(bob, "http://localhost/api/x", {
+        method: "POST",
+        body: JSON.stringify({ body: "Same here" }),
+      }),
+      { params: Promise.resolve({ id: old }) },
+    );
+    await adminDb
+      .collection("auditLogs")
+      .add({ action: "x", at: Timestamp.fromMillis(Date.now() - 400 * DAY) });
+
+    const r = await runRetention(Date.now(), true);
+    expect(r).toMatchObject({ enabled: true, complaints: 1, auditLogs: 1 });
+    expect((await adminDb.doc(`complaints/${old}`).get()).exists).toBe(false);
+    expect((await adminDb.collection(`complaints/${old}/comments`).get()).size).toBe(0);
+    expect((await adminDb.collection(`complaints/${old}/events`).get()).size).toBe(0);
+    expect((await adminDb.doc(`publicComplaints/${old}`).get()).exists).toBe(false);
+    expect(
+      (await adminDb.collection("notifications").where("complaintId", "==", old).get()).size,
+    ).toBe(0);
+    expect(existsSync(file)).toBe(false);
+    for (const kept of [recent, held])
+      expect((await adminDb.doc(`complaints/${kept}`).get()).exists).toBe(true);
+    expect(await audits()).toContain("complaint.retention_delete");
+    // Aggregates stay: they count, they don't identify anyone.
+    expect((await adminDb.collection("stats").get()).size).toBeGreaterThan(0);
+  });
+});
+
+describe("security acceptance (PRD §15.2)", () => {
+  it("rate-limits repeated uploads", async () => {
+    const unknown = "0".repeat(20); // limit is counted before anything else, even for a bad id
+    const tiny = Buffer.from([0xff, 0xd8, 0xff]);
+    const statuses: number[] = [];
+    for (let i = 0; i < 11; i++) {
+      const form = new FormData();
+      form.append("photo", new File([new Uint8Array(tiny)], "p.jpg", { type: "image/jpeg" }));
+      const res = await photoRoute(
+        await authedRequest(bob, "http://localhost/api/x", { method: "POST", body: form }),
+        { params: Promise.resolve({ id: unknown }) },
+      );
+      statuses.push(res.status);
+    }
+    expect(statuses.slice(0, 10).every((s) => s === 404)).toBe(true);
+    expect(statuses[10]).toBe(429);
+  });
+
+  it("audits every staff and committee workflow action with actor and target", async () => {
+    const id = await create(alice);
+    const steps: [string, Record<string, unknown>][] = [
+      [adminToken, { type: "assign", contactId: "maintenance" }],
+      [adminToken, { type: "start", note: "On it" }],
+      [adminToken, { type: "note", note: "Part ordered" }],
+      [adminToken, { type: "priority", priority: "critical", reason: "Spreading" }],
+      [committee, { type: "escalate", reason: "Taking long" }],
+      [adminToken, { type: "hide", reason: "Names someone" }],
+      [adminToken, { type: "unhide" }],
+      [adminToken, { type: "anonymize" }],
+      [adminToken, { type: "resolve", note: "Done" }],
+    ];
+    for (const [token, body] of steps) expect((await act(token, id, body)).status).toBe(200);
+    const logs = (
+      await adminDb.collection("auditLogs").where("target.id", "==", id).get()
+    ).docs.map((d) => d.data());
+    for (const [, body] of steps) {
+      const log = logs.find((l) => l.action === `complaint.${body.type}`);
+      expect(log, `audit for ${body.type}`).toBeTruthy();
+      expect(log!.actorUid).toBeTruthy();
+      expect(JSON.stringify(log!.meta)).not.toMatch(
+        /On it|Part ordered|Spreading|Names someone|Done/,
+      );
+    }
+  });
+});
+
+describe("backup and restore (FR-16)", () => {
+  it("round-trips through age encryption into an empty project, and reconciles photos", async () => {
+    const id = await create(alice);
+    await act(adminToken, id, { type: "assign", contactId: "maintenance" });
+    await commentsPost(
+      await authedRequest(bob, "http://localhost/api/x", {
+        method: "POST",
+        body: JSON.stringify({ body: "Same here" }),
+      }),
+      { params: Promise.resolve({ id }) },
+    );
+    const img = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#888" } })
+      .jpeg()
+      .toBuffer();
+    const form = new FormData();
+    form.append("photo", new File([new Uint8Array(img)], "p.jpg", { type: "image/jpeg" }));
+    await photoRoute(
+      await authedRequest(alice, "http://localhost/api/x", { method: "POST", body: form }),
+      { params: Promise.resolve({ id }) },
+    );
+    const before = (await adminDb.doc(`complaints/${id}`).get()).data()!;
+
+    const backup = await exportBackup();
+    expect(backup.counts).toMatchObject({
+      complaints: 1,
+      "complaints/comments": 1,
+      "complaints/attachments": 1,
+    });
+    expect(backup.attachments).toHaveLength(1);
+    expect(backup.collections.activationCodes).toBeUndefined();
+
+    // Same encryption the scripts use: only the identity holder can read it.
+    const identity = await generateX25519Identity();
+    const e = new Encrypter();
+    e.addRecipient(await identityToRecipient(identity));
+    const sealed = await e.encrypt(JSON.stringify(backup));
+    expect(Buffer.from(sealed).toString("latin1")).not.toContain("Tap leaking");
+    const d = new Decrypter();
+    d.addIdentity(identity);
+    const opened = JSON.parse(await d.decrypt(sealed, "text"));
+
+    await expect(restoreBackup(opened)).rejects.toThrow(/already has complaints/);
+    await resetEmulators(); // a fresh, empty project; photo files stay in storage
+    const r = await restoreBackup(opened);
+    expect(r.mismatches).toEqual([]);
+    expect(r.missingAttachments).toEqual([]);
+    const after = (await adminDb.doc(`complaints/${id}`).get()).data()!;
+    expect(after.createdAt.toMillis()).toBe(before.createdAt.toMillis());
+    expect(after).toMatchObject({
+      ticketId: before.ticketId,
+      status: "assigned",
+      reporterUid: before.reporterUid,
+    });
+    expect((await adminDb.collection(`complaints/${id}/comments`).get()).size).toBe(1);
+
+    // A photo lost from storage shows up in the reconciliation.
+    rmSync(path.join(process.cwd(), ".data", "uploads", ...backup.attachments[0].key.split("/")));
+    await resetEmulators();
+    expect((await restoreBackup(opened)).missingAttachments).toEqual([backup.attachments[0].key]);
   });
 });
