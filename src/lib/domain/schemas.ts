@@ -185,3 +185,15 @@ export const queueQuery = z.object({
   after: queryParam(z.string().regex(/^[a-f0-9]{20}$/)),
 });
 export type QueueQuery = z.infer<typeof queueQuery>;
+
+export const markReadInput = z.union([
+  z.object({
+    ids: z
+      .array(z.string().regex(/^[a-f0-9]{32}$/))
+      .min(1)
+      .max(20),
+  }),
+  z.object({ all: z.literal(true) }),
+]);
+
+export const preferencesInput = z.object({ muteNonEssential: z.boolean() });

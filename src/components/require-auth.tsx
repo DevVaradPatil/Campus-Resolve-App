@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Banner } from "@/components/ui/feedback";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/lib/client/auth";
+import { useNotifications } from "@/lib/client/notifications";
 
 /**
  * Client-side gate for signed-in screens. UI convenience only: every API route enforces
@@ -16,6 +17,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
   const { state, refresh } = useAuth();
   const router = useRouter();
   const path = usePathname();
+  const unread = useNotifications(state.status === "signedIn" ? state.me : null, true);
 
   useEffect(() => {
     if (state.status === "signedOut")
@@ -44,5 +46,9 @@ export function RequireAuth({ children }: { children: ReactNode }) {
         <Spinner label="Loading" className="size-8 text-ink" />
       </div>
     );
-  return <AppShell role={state.me.role}>{children}</AppShell>;
+  return (
+    <AppShell role={state.me.role} unread={unread?.length ?? 0}>
+      {children}
+    </AppShell>
+  );
 }

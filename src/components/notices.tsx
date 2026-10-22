@@ -59,7 +59,7 @@ export type NotificationView = {
   read: boolean;
 };
 
-export function NotificationItem({ n }: { n: NotificationView }) {
+export function NotificationItem({ n, onOpen }: { n: NotificationView; onOpen?: () => void }) {
   return (
     <li className="relative flex gap-3 px-4 py-3 hover:bg-paper">
       <span
@@ -72,6 +72,7 @@ export function NotificationItem({ n }: { n: NotificationView }) {
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <Link
           href={n.href}
+          onClick={onOpen}
           className={clsx("after:absolute after:inset-0", !n.read && "font-semibold")}
         >
           {!n.read && <span className="sr-only">Unread: </span>}

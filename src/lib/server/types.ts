@@ -18,6 +18,8 @@ export type UserDoc = {
   floor: string;
   room: string;
   active: boolean;
+  /** Hide non-essential notifications (PRD §13). Missing = false. */
+  muteNonEssential?: boolean;
   createdAt: Timestamp;
   updatedAt: Timestamp;
 };

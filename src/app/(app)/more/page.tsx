@@ -2,17 +2,23 @@
 
 import { LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { ChangePasswordForm } from "@/components/auth-forms";
 import { LocationPath } from "@/components/issue";
 import { Pseudonym } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/field";
+import { useToast } from "@/components/ui/toast";
+import { api } from "@/lib/client/api";
 import { Panel } from "@/components/ui/surface";
 import { useAuth } from "@/lib/client/auth";
 
 const ROLE_LABEL = { student: "Student", committee: "Hostel committee", admin: "Admin" };
 
 export default function MorePage() {
-  const { state, signOut } = useAuth();
+  const { state, signOut, refresh } = useAuth();
+  const toast = useToast();
+  const [savingPrefs, setSavingPrefs] = useState(false);
   const router = useRouter();
   if (state.status !== "signedIn") return null;
   const { me } = state;
@@ -57,6 +63,26 @@ export default function MorePage() {
         <p className="border-t border-rule px-4 py-3 text-sm text-muted">
           Room details wrong? Ask your hostel admin to update the roster.
         </p>
+      </Panel>
+      <Panel title="Notifications">
+        <div className="px-4 pb-2">
+          <Switch
+            label="Only important notifications"
+            description="Hide routine updates like assignments and progress notes. You'll still hear when something needs your reply or is escalated."
+            checked={me.muteNonEssential}
+            disabled={savingPrefs}
+            onCheckedChange={async (muteNonEssential) => {
+              setSavingPrefs(true);
+              try {
+                await api("/api/me/preferences", { method: "POST", body: { muteNonEssential } });
+                await refresh();
+              } catch (e) {
+                toast({ title: "Couldn't save that", body: (e as Error).message, tone: "danger" });
+              }
+              setSavingPrefs(false);
+            }}
+          />
+        </div>
       </Panel>
       <Panel title="Change password">
         <ChangePasswordForm />

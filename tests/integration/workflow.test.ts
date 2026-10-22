@@ -7,6 +7,8 @@ import { GET as reporterRoute } from "@/app/api/complaints/[id]/reporter/route";
 import { GET as viewRoute } from "@/app/api/complaints/[id]/route";
 import { POST as createRoute } from "@/app/api/complaints/route";
 import { POST as cronRoute } from "@/app/api/cron/sweep/route";
+import { POST as prefsRoute } from "@/app/api/me/preferences/route";
+import { POST as markReadRoute } from "@/app/api/notifications/read/route";
 import { DEFAULT_CATEGORIES, DEV_BLOCKS, DEV_CONTACTS, DEV_ROUTING } from "@/lib/domain/defaults";
 import { activate, importRoster, issueCodes, login, setRole } from "@/lib/server/accounts";
 import type { SessionUser } from "@/lib/server/auth";
@@ -331,5 +333,87 @@ describe("queues", () => {
     const { items } = await res.json();
     expect(items.map((i: { id: string }) => i.id)).toEqual([overdue]);
     expect((await committeeRoute(await authedRequest(alice), undefined as never)).status).toBe(403);
+  });
+});
+
+describe("notifications (FR-13)", () => {
+  const notes = async (uid: string) =>
+    (await adminDb.collection("notifications").where("recipientUid", "==", uid).get()).docs;
+  const uidOf = async (roll: string) =>
+    (await adminDb.doc(`roster/${roll}`).get()).get("uid") as string;
+  const markRead = async (token: string, body: unknown) =>
+    (
+      await markReadRoute(
+        await authedRequest(token, "http://localhost/api/notifications/read", {
+          method: "POST",
+          body: JSON.stringify(body),
+        }),
+        undefined as never,
+      )
+    ).json();
+
+  it("tells admins about new complaints and the reporter about progress, deduped", async () => {
+    const id = await create(alice);
+    expect((await notes(admin.uid)).map((d) => d.get("title"))).toEqual([
+      "New complaint CR-000001",
+    ]);
+    await act(adminToken, id, { type: "assign", contactId: "maintenance" });
+    await act(adminToken, id, { type: "note", note: "Plumber booked" });
+    await act(adminToken, id, { type: "note", note: "Part ordered" });
+    const mine = (await notes(await uidOf("231001"))).map((d) => d.data());
+    expect(mine.map((n) => n.type).sort()).toEqual(["assigned", "note"]);
+    expect(mine.find((n) => n.type === "note")).toMatchObject({
+      body: "Part ordered", // the hour's second note replaced the first
+      read: false,
+      href: `/complaints/${id}`,
+    });
+  });
+
+  it("keeps confidential complaints out of previews and staff-only notes out of everything", async () => {
+    const id = await create(alice, {
+      visibility: "confidential",
+      title: "Roommate harassment issue",
+    });
+    await act(adminToken, id, { type: "assign", contactId: "maintenance" });
+    await act(adminToken, id, { type: "priority", priority: "critical", reason: "Safety" });
+    const all = (await adminDb.collection("notifications").get()).docs.map((d) => d.data());
+    expect(JSON.stringify(all)).not.toMatch(/harassment|Safety/i);
+    expect(all.every((n) => n.body === null)).toBe(true);
+  });
+
+  it("marks only your own notifications read", async () => {
+    await create(alice);
+    const [n] = await notes(admin.uid);
+    expect(await markRead(bob, { ids: [n.id] })).toEqual({ updated: 0 });
+    expect(await markRead(adminToken, { all: true })).toEqual({ updated: 1 });
+    expect((await adminDb.doc(`notifications/${n.id}`).get()).get("read")).toBe(true);
+  });
+
+  it("reminds the reporter once before auto-close", async () => {
+    const id = await create(alice);
+    await act(adminToken, id, { type: "assign", contactId: "maintenance" });
+    await act(adminToken, id, { type: "resolve", note: "Fixed it" });
+    await adminDb
+      .doc(`complaints/${id}`)
+      .update({ confirmationDeadline: Timestamp.fromMillis(Date.now() + 2 * 3600_000) });
+    expect(await sweep()).toMatchObject({ reminded: 1, closed: 0 });
+    expect(await sweep()).toMatchObject({ reminded: 0 });
+    const types = (await notes(await uidOf("231001"))).map((d) => d.get("type"));
+    expect(types.filter((t) => t === "closure_reminder")).toHaveLength(1);
+  });
+
+  it("saves the mute preference and audits it", async () => {
+    const res = await prefsRoute(
+      await authedRequest(alice, "http://localhost/api/me/preferences", {
+        method: "POST",
+        body: JSON.stringify({ muteNonEssential: true }),
+      }),
+      undefined as never,
+    );
+    expect(res.status).toBe(200);
+    expect(
+      (await adminDb.doc(`users/${await uidOf("231001")}`).get()).get("muteNonEssential"),
+    ).toBe(true);
+    expect(await audits()).toContain("account.preferences");
   });
 });

@@ -7,6 +7,7 @@ import {
   type LifecycleEvent,
   type WorkflowAction,
 } from "@/lib/domain/lifecycle";
+import { notificationsFor } from "@/lib/domain/notifications";
 import { can } from "@/lib/domain/permissions";
 import type { WorkflowInput } from "@/lib/domain/schemas";
 import { writeAudit, type AuditAction } from "./audit";
@@ -15,6 +16,7 @@ import { notFound, viewerOf, type Viewer } from "./complaints";
 import { loadConfig, type HostelConfig } from "./config";
 import { adminDb } from "./firebase-admin";
 import { forbidden, HttpError } from "./http";
+import { adminUids, writeNotifications } from "./notify";
 import type { ComplaintDoc } from "./types";
 
 const db = adminDb;
@@ -63,6 +65,7 @@ export function writeTransition(
   { patch, event }: { patch: Partial<ComplaintDoc>; event: LifecycleEvent },
   actorUid: string | null,
   action: AuditAction,
+  adminUids: string[],
 ) {
   const ref = db.doc(`complaints/${id}`);
   tx.update(ref, patch);
@@ -78,11 +81,24 @@ export function writeTransition(
     outcome: "success",
     meta: { ticketId: c.ticketId, from: c.status, to: patch.status ?? c.status },
   });
+  const next = { ...c, ...patch } as ComplaintDoc;
+  writeNotifications(
+    tx,
+    id,
+    notificationsFor(event.type, next, {
+      actorUid,
+      adminUids,
+      note: event.internal ? null : event.note,
+    }),
+  );
 }
 
 /** POST /api/complaints/[id]/actions. Every check runs on the server, inside the transaction. */
 export async function act(user: SessionUser, id: string, input: WorkflowInput) {
-  const cfg = input.type === "assign" || input.type === "resolve" ? await loadConfig() : null;
+  const [cfg, admins] = await Promise.all([
+    input.type === "assign" || input.type === "resolve" ? loadConfig() : null,
+    adminUids(),
+  ]);
   const ref = db.doc(`complaints/${id}`);
   await db.runTransaction(async (tx) => {
     const c = (await tx.get(ref)).data() as ComplaintDoc | undefined;
@@ -112,7 +128,7 @@ export async function act(user: SessionUser, id: string, input: WorkflowInput) {
       if (e instanceof LifecycleError) throw new HttpError(409, e.message);
       throw e;
     }
-    writeTransition(tx, id, c, result, user.uid, `complaint.${input.type}`);
+    writeTransition(tx, id, c, result, user.uid, `complaint.${input.type}`, admins);
   });
 }
 

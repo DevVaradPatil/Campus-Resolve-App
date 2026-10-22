@@ -15,6 +15,14 @@ service cloud.firestore {
       allow list: if isActiveUser() && request.query.limit <= 20;
     }
 
+    // Your own notifications only, latest 20 at a time. Marking read goes through the API.
+    match /notifications/{id} {
+      allow get: if isActiveUser() && resource.data.recipientUid == request.auth.uid;
+      allow list: if isActiveUser()
+        && resource.data.recipientUid == request.auth.uid
+        && request.query.limit <= 20;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

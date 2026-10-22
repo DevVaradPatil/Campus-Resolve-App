@@ -16,6 +16,7 @@ import {
 } from "@/lib/domain/complaint";
 import { can } from "@/lib/domain/permissions";
 import { isOverdue } from "@/lib/domain/lifecycle";
+import { notificationsFor } from "@/lib/domain/notifications";
 import type { CreateComplaintInput, WorkflowInput } from "@/lib/domain/schemas";
 import { writeAudit } from "./audit";
 import type { SessionUser } from "./auth";
@@ -25,6 +26,7 @@ import { HttpError } from "./http";
 import { reencodeImage } from "./images";
 import { consume, LIMITS } from "./rate-limit";
 import { deleteObject, putObject, signedUrl } from "./storage";
+import { adminUids, writeNotifications } from "./notify";
 import { availableActions } from "./workflow";
 import type { AttachmentDoc, ComplaintDoc, EventDoc } from "./types";
 
@@ -67,6 +69,7 @@ export async function createComplaint(user: SessionUser, input: CreateComplaintI
   const nowMs = Date.now();
   const deadline = Timestamp.fromMillis(firstActionDeadline(priority, nowMs));
 
+  const admins = await adminUids();
   return db.runTransaction(async (tx) => {
     const counterRef = db.doc("systemSettings/ticketCounter");
     const [snap, counter] = await tx.getAll(ref, counterRef);
@@ -119,7 +122,6 @@ export async function createComplaint(user: SessionUser, input: CreateComplaintI
     const event = (e: Omit<EventDoc, "at">) =>
       tx.set(ref.collection("events").doc(), { ...e, at: now });
     event({ type: "created", status: "submitted", actorUid: user.uid, note: null });
-    // Phase 5: notify the designated lead here as well (notify.ts).
     if (critical)
       event({
         type: "escalated",
@@ -127,6 +129,11 @@ export async function createComplaint(user: SessionUser, input: CreateComplaintI
         actorUid: null,
         note: "Raised to the hostel lead automatically because it's critical.",
       });
+    writeNotifications(
+      tx,
+      id,
+      notificationsFor("created", record, { actorUid: user.uid, adminUids: admins, critical }),
+    );
     writeAudit(tx, {
       actorUid: user.uid,
       action: "complaint.create",

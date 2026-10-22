@@ -40,5 +40,6 @@ export const toMe = (u: SessionUser) => ({
   block: u.block,
   floor: u.floor,
   room: u.room,
+  muteNonEssential: !!u.muteNonEssential,
 });
 export type Me = ReturnType<typeof toMe>;

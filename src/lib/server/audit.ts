@@ -14,6 +14,7 @@ export type AuditAction =
   | "account.room_change"
   | "account.role_change"
   | "account.admin_created"
+  | "account.preferences"
   | "activation.issue"
   | "roster.import"
   | "config.seed"

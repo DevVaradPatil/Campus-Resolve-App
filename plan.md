@@ -15,7 +15,7 @@ admin workflow & escalation → dashboards & notifications → hardening & recov
 | 2 | Foundation: roster, auth, roles, audit | ✅ Done (security review in Phase 7) |
 | 3 | Complaint core: submit, route, upload, feed | ✅ Done on emulators (Supabase bucket check is in the Phase 0 spike) |
 | 4 | Workflow: assign, status, deadlines, escalate, resolve, close, reopen | ✅ Done (reminders/notifications move to Phase 5) |
-| 5 | Community & notifications | ⬜ Not started |
+| 5 | Community & notifications | 🟨 Notifications done; upvotes, comments, reports, duplicates next |
 | 6 | Dashboards, contacts, analytics, export | ⬜ Not started |
 | 7 | Hardening & recovery | ⬜ Not started |
 | 8 | Deploy & pilot | ⬜ Not started |
@@ -267,12 +267,14 @@ Tests
 - [ ] Report content (complaint/comment/image) → moderation queue. Committee/admin resolve the report: hide, keep, or unpublish image without deleting the complaint (§11.3).
 - [ ] Pseudonyms: consistent per-user alias generated at activation. Admin can force the generic "A resident" label.
 - [ ] Duplicates: student "report as duplicate of…"; admin links duplicate → primary in a transaction. Both histories preserved, support counts aggregated on the primary, confidential reporter's identity and attachments never exposed through the link (FR-08).
-- [ ] Notifications: `lib/server/notify.ts` creates notification docs with a dedupe key (type + ticket + recipient + time bucket). Creation is decoupled from delivery, so email can be added later.
-  - [ ] Events: assignment, status change, resolution request, pre-closure reminder, reopen, comment on own complaint, escalation outcome, critical escalation to lead
-  - [ ] Sweep reminders (from Phase 4): unassigned-complaint reminder to admins, overdue escalation to the designated lead and backup (add a "lead"/"backup" setting)
-  - [ ] Previews of confidential tickets carry no content (§12.4)
-- [ ] Notification centre UI: unread count via a client listener limited to the latest 20, mark read / mark all read (via API)
-- [ ] Preference: mute non-essential notifications
+- [x] Notifications: who hears what is the pure `notificationsFor()` (`src/lib/domain/notifications.ts`); `notify.ts` writes them **in the same transaction** as the change (`writeTransition`, `createComplaint`). Doc id = hash(type + ticket + recipient + hour bucket), so repeats within the hour collapse into one. Creation is separate from delivery, so email can be added later.
+  - [x] Reporter: assigned, work started, admin notes, resolved ("Is it fixed?", essential), auto-closed, escalated, hidden. Admins: new complaint (critical ones are essential and titled "Critical"), reopened, escalated. The actor is never notified of their own action.
+  - [x] Sweep: reminder to the reporter ~12 h before auto-close, once per resolution (`notifyOnce`). Overdue escalations notify admins and the reporter.
+  - [x] Confidential complaints: no title or notes in the preview, only the ticket number. Staff-only (internal) event notes never go into notifications.
+  - [ ] *Changed:* no separate "unassigned reminder" or lead/backup setting. In a 1–2 admin pilot every active admin is the lead, and the overdue escalation already alerts them. Add a lead/backup setting if the admin team grows.
+  - [ ] Comment on own complaint (lands with comments)
+- [x] Notification centre `/notifications`: client listener on the latest 20 (rules: own docs only, `limit <= 20`), unread badge in the shell from the same kind of listener, mark read on open and "mark all read" via `POST /api/notifications/read` (own docs only)
+- [x] Preference: "Only important notifications" switch on `/more` (`POST /api/me/preferences`, audited). Muting filters the view and the badge; nothing is dropped.
 - [ ] Optional if capacity permits: follow complaints (not a launch blocker)
 
 Tests: FR-08, FR-09, FR-10, FR-13. Rules test confirms a user can read only their own notifications.
@@ -368,6 +370,7 @@ Email/WhatsApp/SMS, PWA install, maps, staff accounts, multi-hostel, institution
 ## Change log
 
 - 2026-10-21: Plan created from PRD v1.0.
+- 2026-10-22: Phase 5 slice 1: in-app notifications (transactional, deduped, confidential-safe), notification centre, mute preference, pre-closure reminder.
 - 2026-10-22: Phase 4 landed: lifecycle module, action route, sweep + GitHub cron, admin queue, committee page, feedback, audited reporter lookup.
 - 2026-10-22: npm override `jwks-rsa@^3.2.2` fixes the Vercel API 500 (ERR_REQUIRE_ESM on jose).
 - 2026-10-22: First Vercel deploy. API 500 under investigation; `vercel.json` pins functions to bom1; `seed-dev.ts --real` for first setup of a real project.
