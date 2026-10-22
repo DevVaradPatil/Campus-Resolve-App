@@ -12,7 +12,8 @@
     "test": "vitest run --dir src --passWithNoTests",
     "emulators": "firebase emulators:start --project demo-campusresolve",
     "test:emu": "firebase emulators:exec --only auth,firestore --project demo-campusresolve \"vitest run --dir tests --no-file-parallelism\"",
-    "create-admin": "tsx --env-file=.env.local --conditions=react-server scripts/create-admin.ts"
+    "create-admin": "tsx --env-file=.env.local --conditions=react-server scripts/create-admin.ts",
+    "seed-dev": "tsx --env-file=.env.local --conditions=react-server scripts/seed-dev.ts"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -24,6 +25,7 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "^0.0.1",
+    "sharp": "^0.35.5",
     "zod": "^4.6.7"
   },
   "devDependencies": {

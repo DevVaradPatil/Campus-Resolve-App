@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { LIMITS, LOCATION_TYPE_IDS, PRIORITIES, VISIBILITIES } from "./complaint";
 import { GRANTABLE, ROLES } from "./permissions";
 
 export const PASSWORD_MIN = 10;
@@ -49,3 +50,98 @@ export const setRoleInput = z.object({
   role: z.enum(ROLES),
   grants: z.array(z.enum(GRANTABLE as [string, ...string[]])).default([]),
 });
+
+// --- Hostel configuration (admin-editable; PRD §5, §10) ---
+
+const slug = z
+  .string()
+  .regex(/^[a-z0-9][a-z0-9-]{0,39}$/, "IDs use lowercase letters, numbers and dashes.");
+const label = z.string().trim().min(1, "Enter a name.").max(80);
+
+export const categorySchema = z.object({
+  id: slug,
+  label,
+  description: z.string().trim().max(160).default(""),
+  defaultPriority: z.enum(PRIORITIES),
+  closureWindowHours: z
+    .number()
+    .int()
+    .min(1)
+    .max(24 * 14),
+  subcategories: z
+    .array(z.object({ id: slug, label, priority: z.enum(PRIORITIES).optional() }))
+    .max(20),
+  active: z.boolean(),
+  order: z.number().int().min(0).max(999),
+});
+export type Category = z.infer<typeof categorySchema>;
+
+export const blockSchema = z.object({
+  id: slug,
+  label,
+  floors: z.array(z.object({ id: slug, label })).max(20),
+  active: z.boolean(),
+  order: z.number().int().min(0).max(999),
+});
+export type Block = z.infer<typeof blockSchema>;
+
+export const contactSchema = z.object({
+  id: slug,
+  name: label,
+  role: z.string().trim().max(80).default(""),
+  phone: z.string().trim().max(20).default(""),
+  email: z.union([z.literal(""), z.email().max(120)]).default(""),
+  /** Shown in the emergency notice. */
+  emergency: z.boolean(),
+  active: z.boolean(),
+});
+export type Contact = z.infer<typeof contactSchema>;
+
+export const routingRuleSchema = z.object({
+  id: slug,
+  categoryId: slug.nullable(),
+  blockId: slug.nullable(),
+  contactId: slug,
+  enabled: z.boolean(),
+});
+export type RoutingRule = z.infer<typeof routingRuleSchema>;
+
+export const CONFIG_SCHEMAS = {
+  categories: categorySchema,
+  locations: blockSchema,
+  contacts: contactSchema,
+  routingRules: routingRuleSchema,
+} as const;
+export type ConfigKind = keyof typeof CONFIG_SCHEMAS;
+
+// --- Complaints ---
+
+/** Blank optional text arrives as "" from forms; store it as null. */
+const optionalText = (max: number) =>
+  z.preprocess(
+    (v) => (typeof v === "string" && !v.trim() ? null : v),
+    z.string().trim().max(max).nullable().default(null),
+  );
+
+export const createComplaintInput = z.object({
+  /** Client-generated per draft, so a retried submit can't create a second ticket (PRD §12.3). */
+  idempotencyKey: z.string().regex(/^[A-Za-z0-9-]{16,64}$/),
+  categoryId: slug,
+  subcategoryId: slug.nullable().default(null),
+  title: z.string().trim().min(5, "Use at least 5 characters.").max(LIMITS.title),
+  description: z
+    .string()
+    .trim()
+    .min(10, "Describe the problem in at least 10 characters.")
+    .max(LIMITS.description),
+  location: z.object({
+    blockId: slug.nullable(),
+    floorId: slug.nullable(),
+    type: z.enum(LOCATION_TYPE_IDS),
+    roomReference: optionalText(LIMITS.roomReference),
+    description: optionalText(LIMITS.locationDescription),
+  }),
+  urgent: z.boolean().default(false),
+  visibility: z.enum(VISIBILITIES),
+});
+export type CreateComplaintInput = z.infer<typeof createComplaintInput>;

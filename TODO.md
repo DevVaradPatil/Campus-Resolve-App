@@ -7,7 +7,7 @@ Secrets go in `.env.local` (dev) or the host's env settings (prod). **Never comm
 ## Before Phase 0 (needed to start)
 
 - [ ] **Decide hosting (D1 in plan.md):** read the Vercel Hobby terms (personal, non-commercial use) and decide whether a free, student-led hostel pilot qualifies. Tell Claude: Vercel or Cloudflare Workers.
-- [ ] **Check image storage billing (D2):** in the Cloudflare dashboard, see whether enabling R2 asks for a card/PayPal. If it does and you won't add one, tell Claude to use the Supabase Storage fallback.
+- [ ] **Check image storage billing (D2):** in the Cloudflare dashboard, see whether enabling R2 asks for a card/PayPal. If it does and you won't add one, tell Claude to use the Supabase Storage fallback. Until this is decided, photo uploads only work against the local emulators (complaints themselves work everywhere).
 - [ ] Create a GitHub repository (private is fine), then add it as `origin` and push `main` (Claude has made the local repo)
 - [x] ~~Install Node + Firebase CLI~~. Node 24 and Java 21 are present, and the Firebase CLI is a project devDependency. Run `npx firebase login` once before any real deploy.
 - [ ] Create a **Vercel** account (Hobby) and import the GitHub repo, so Claude can run the deployed runtime spike. Add the dev Firebase/R2 env vars from below in Vercel → Settings → Environment Variables (Preview).
@@ -55,7 +55,7 @@ Generate each with `node -e "console.log(require('crypto').randomBytes(32).toStr
 - [ ] **Emergency contacts** to show in-app (campus security, health centre, fire). Verify the numbers.
 - [ ] Approve or edit **priority targets** (Critical 1h, High 8h, Normal 48h, Low 5d)
 - [ ] Approve or edit **closure windows** per category (Mess 48h, Canteen 48h, Infra 72h, Garden 48h, Water 24h, Other 72h)
-- [ ] Approve the **category → priority rules** (e.g. which subcategories count as Critical: no water, electrical hazard…)
+- [ ] Approve the **category → priority rules** (e.g. which subcategories count as Critical: no water, electrical hazard…). The proposal is in `src/lib/domain/defaults.ts`; once real data exists you can edit it at `/admin/config`.
 - [ ] Approve the **location hierarchy**: actual blocks, floors and common-area names for the hostel
 - [ ] Approve the **one-year retention policy**
 - [ ] Approve the **public-photo rules** and the **privacy notice / acceptable-use** text (Claude will draft them in Phase 7)

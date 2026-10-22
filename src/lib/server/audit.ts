@@ -14,12 +14,16 @@ export type AuditAction =
   | "account.role_change"
   | "account.admin_created"
   | "activation.issue"
-  | "roster.import";
+  | "roster.import"
+  | "config.seed"
+  | "config.update"
+  | "complaint.create"
+  | "attachment.upload";
 
 export type AuditEntry = {
   actorUid: string | null;
   action: AuditAction;
-  target: { type: "user" | "roster" | "system"; id: string };
+  target: { type: "user" | "roster" | "system" | "config" | "complaint"; id: string };
   outcome: "success" | "failure";
   /** Minimal, non-sensitive context. Never passwords, codes, tokens or complaint bodies. */
   meta?: Record<string, string | number | boolean | null>;

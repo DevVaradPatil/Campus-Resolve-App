@@ -11,6 +11,8 @@ export const LIMITS = {
   activateAccount: { limit: 5, windowSec: 15 * 60 },
   activateIp: { limit: 40, windowSec: 15 * 60 },
   passwordChange: { limit: 3, windowSec: 60 * 60 },
+  complaintCreate: { limit: 5, windowSec: 60 * 60 },
+  upload: { limit: 10, windowSec: 60 * 60 },
 } as const;
 
 type Limit = { limit: number; windowSec: number };

@@ -1,11 +1,11 @@
 /* eslint-disable @next/next/no-img-element -- signed attachment URLs, see ui/media.tsx */
 
 import clsx from "clsx";
-import { ChevronRight, ThumbsUp } from "lucide-react";
+import { ChevronRight, Lock, ThumbsUp } from "lucide-react";
 import Link from "next/link";
 import { Fragment } from "react";
-import { EscalatedBadge, PriorityBadge, StatusBadge, TicketId } from "@/components/ui/badge";
-import type { Priority, Status } from "@/lib/domain/complaint";
+import { EscalatedBadge, PriorityBadge, StatusBadge, Tag, TicketId } from "@/components/ui/badge";
+import type { IssueSummary, Status } from "@/lib/domain/complaint";
 import { formatDateTime } from "@/lib/format";
 
 /** Safe public location, e.g. ["Block B", "Second floor", "Common bathroom"]. Never a room number. */
@@ -24,20 +24,8 @@ export function LocationPath({ parts, className }: { parts: string[]; className?
   );
 }
 
-/** Shape of a `publicComplaints` doc as the feed sees it. No reporter data by construction. */
-export type PublicIssue = {
-  id: string;
-  ticketId: string;
-  title: string;
-  category: string;
-  status: Status;
-  priority: Priority;
-  escalated?: boolean;
-  supportCount: number;
-  location: string[];
-  createdAt: string;
-  thumbUrl?: string;
-};
+/** Feed / "My complaints" row. Public rows carry no reporter data by construction. */
+export type PublicIssue = IssueSummary;
 
 /** One row on the register: a feed item inside a Panel's RuledList. */
 export function IssueRow({ issue, href }: { issue: PublicIssue; href: string }) {
@@ -48,6 +36,12 @@ export function IssueRow({ issue, href }: { issue: PublicIssue; href: string }) 
           <StatusBadge status={issue.status} />
           {issue.escalated && <EscalatedBadge />}
           <PriorityBadge priority={issue.priority} />
+          {issue.confidential && (
+            <Tag>
+              <Lock aria-hidden className="size-3" />
+              Confidential
+            </Tag>
+          )}
         </div>
         <h3 className="text-base leading-snug font-semibold">
           {/* Stretched link: the whole row is the tap target */}

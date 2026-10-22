@@ -27,6 +27,11 @@ const collections = [
   "complaints",
   "auditLogs",
   "notifications",
+  "categories",
+  "locations",
+  "contacts",
+  "routingRules",
+  "systemSettings",
 ];
 
 describe("default-deny rules", () => {

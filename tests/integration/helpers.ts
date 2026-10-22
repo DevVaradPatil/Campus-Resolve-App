@@ -27,7 +27,10 @@ export async function authedRequest(
   const idToken = await cred.user.getIdToken();
   return new Request(url, {
     ...init,
-    headers: { authorization: `Bearer ${idToken}`, "content-type": "application/json" },
+    headers: {
+      authorization: `Bearer ${idToken}`,
+      ...(!(init.body instanceof FormData) && { "content-type": "application/json" }),
+    },
   });
 }
 

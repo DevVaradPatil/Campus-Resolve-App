@@ -1,8 +1,9 @@
 import "server-only";
 import type { Timestamp } from "firebase-admin/firestore";
+import type { ComplaintRecord, Status } from "@/lib/domain/complaint";
 import type { Role } from "@/lib/domain/permissions";
 
-// Firestore document shapes for Phase 2 collections. None of these are client-readable.
+// Firestore document shapes. None of these are client-readable.
 
 /** users/{uid}: profile + authorization. Stable UID survives room changes (PRD §9.1). */
 export type UserDoc = {
@@ -46,4 +47,30 @@ export type ActivationCodeDoc = {
   consumedAt: Timestamp | null;
   issuedBy: string;
   issuedAt: Timestamp;
+};
+
+/** complaints/{id}: the internal record (PRD §5.3). */
+export type ComplaintDoc = ComplaintRecord<Timestamp>;
+
+/** complaints/{id}/events/{eventId}: append-only history. */
+export type EventDoc = {
+  type: "created" | "escalated";
+  status: Status;
+  actorUid: string | null; // null = system
+  note: string | null;
+  at: Timestamp;
+};
+
+/** complaints/{id}/attachments/{attachmentId}. Bytes live in object storage under `key`. */
+export type AttachmentDoc = {
+  key: string;
+  contentType: "image/webp";
+  bytes: number;
+  width: number;
+  height: number;
+  /** private: owner and authorized staff only. public: shown on the public complaint. */
+  privacy: "public" | "private";
+  publication: "published" | "hidden";
+  uploadedBy: string;
+  createdAt: Timestamp;
 };

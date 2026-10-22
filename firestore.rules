@@ -1,9 +1,20 @@
 rules_version = '2';
 
 // Deny by default. All writes go through server route handlers (Admin SDK bypasses these rules).
-// Client reads are added here only as an explicit allowlist (see CLAUDE.md).
+// Client reads are an explicit allowlist (see CLAUDE.md).
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isActiveUser() {
+      return request.auth != null
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.active == true;
+    }
+
+    // Public projection built only by toPublicComplaint(). Pages are capped at 20 (quota, PRD §8.3).
+    match /publicComplaints/{id} {
+      allow get: if isActiveUser();
+      allow list: if isActiveUser() && request.query.limit <= 20;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

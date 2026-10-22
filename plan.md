@@ -13,7 +13,7 @@ admin workflow & escalation → dashboards & notifications → hardening & recov
 | 0 | Decisions, spikes & scaffold | 🟨 Scaffold done; deployed spike waits on accounts (TODO.md) |
 | 1 | Design system | ✅ Done (real-phone/axe pass deferred to Phase 7) |
 | 2 | Foundation: roster, auth, roles, audit | ✅ Done (security review in Phase 7) |
-| 3 | Complaint core: submit, route, upload, feed | ⬜ Not started |
+| 3 | Complaint core: submit, route, upload, feed | ✅ Done on emulators (real photo storage waits on D2) |
 | 4 | Workflow: assign, status, deadlines, escalate, resolve, close, reopen | ⬜ Not started |
 | 5 | Community & notifications | ⬜ Not started |
 | 6 | Dashboards, contacts, analytics, export | ⬜ Not started |
@@ -177,41 +177,46 @@ Rules & tests
 
 **Goal:** students submit, view and track complaints with no cross-account leakage (PRD §4.2, §5, §11).
 
-Config data
-- [ ] `categories` (PRD §5.1 seed, with subcategories, priority rule, closure window from §6.3) and admin CRUD
-- [ ] `locations` (block → floor → common area types from §5.2) and admin CRUD
-- [ ] `contacts` and `routingRules` (category ± location → contact, with fallback queue) and admin CRUD
-- [ ] `scripts/seed-dev.ts` for emulator data
+Config data (`src/lib/server/config.ts`; schemas in `schemas.ts`, PRD defaults in `src/lib/domain/defaults.ts`)
+- [x] `categories`: PRD §5.1 seed with subcategories, default priority + per-subcategory override, §6.3 closure window
+- [x] `locations`: one doc per block with its floors. Location *types* (§5.2) are a fixed code list, not config.
+- [x] `contacts` (with an `emergency` flag that feeds the emergency notice) and `routingRules` (category ± block → contact)
+- [x] Admin CRUD: `GET /api/admin/config`, `PUT /api/admin/config/[kind]` (zod per kind, audited). Items are switched off, never deleted. UI at `/admin/config` (tabs + edit dialog).
+- [x] `npm run seed-dev`: PRD categories plus placeholder blocks A–D, contacts and routing (refuses to run without emulators)
 
-Domain (pure, unit-tested)
-- [ ] `priority.ts`: category rule → priority + `priorityRule` id. A student "urgent" flag is recorded but doesn't change priority.
-- [ ] `deadlines.ts`: first-action deadline from priority (§6.2: 1h/8h/48h/5d)
-- [ ] `routing.ts`: most-specific match wins (category+location > category > fallback)
-- [ ] `safeLocationLabel()`: builds e.g. "Block B · Second floor · Common bathroom" and never includes the room reference
-- [ ] `toPublicComplaint()`: the **only** public projection
+Domain (pure, unit-tested; all in `src/lib/domain/complaint.ts` rather than one file each)
+- [x] `priorityFor()`: subcategory override, else category default, plus the rule id. The student's "urgent" flag is recorded but doesn't change priority.
+- [x] `firstActionDeadline()`: §6.2 targets 1h/8h/48h/5d
+- [x] `routeComplaint()`: category+block > category > block > catch-all, skipping disabled rules and inactive contacts; no match → admin fallback queue (`contactId: null`)
+- [x] `safeLocationLabel()`: built only from block/floor/type ids, never the room reference or free text
+- [x] `toPublicComplaint()`: the **only** public projection (allowlist; unit test asserts the exact key set)
+- [x] `searchTokens()`: lowercase title keywords for `array-contains` search
 
 Server
-- [ ] `POST /api/complaints`: rate limit (5/h) → zod (length caps) → ticket ID → priority, deadline, routing → transaction writes `complaints`, `events` (created), `auditLogs`, and `publicComplaints` unless confidential. Idempotency key from the client to block duplicate submits (§12.3).
-- [ ] Critical priority → immediate escalation notification to the designated lead (hook ready for Phase 5 notifications)
-- [ ] `POST /api/uploads`: auth, ticket ownership, ≤3 files/complaint, ≤5 MB, 10/h rate limit, magic-byte check (JPEG/PNG/WebP only) → `sharp` rotate + re-encode to WebP/JPEG + strip metadata → generated key → `attachments` doc with privacy class. Reject SVG/HTML/anything else (FR-04).
-- [ ] `GET /api/attachments/:id/url`: authorize per complaint visibility → short-lived signed URL. Public images on public complaints are served only once their publication state is `published`.
-- [ ] `GET /api/complaints/mine` (paginated) and `GET /api/complaints/:id`, with the DTO shaped by role (owner sees own private fields; others get the public shape or 404)
+- [x] `POST /api/complaints`: idempotency (doc id = hash of uid + client draft key, so a retry returns the same ticket) → rate limit (5/h) → zod → validate against live config → priority, deadline, routing → one transaction writes the complaint, `events` (created), `auditLogs`, the ticket counter and `publicComplaints` (unless confidential)
+- [x] Critical priority → `escalated: true` plus an `escalated` event at creation. The notification to the lead is a Phase 5 hook (comment in `complaints.ts`).
+- [x] `POST /api/complaints/[id]/photos` (one photo per request): rate limit 10/h → owner only → ≤3 per complaint (re-checked in the transaction) → ≤5 MB → magic bytes (JPEG/PNG/WebP) → `sharp` rotate, resize to 2048px, re-encode to WebP, metadata dropped → generated key → attachment doc + audit. Confidential complaints get `privacy: private`.
+- [x] Signed URLs are embedded in `GET /api/complaints/[id]` (no separate URL endpoint). Public viewers only get `public` + `published` photos.
+- [x] `GET /api/complaints/mine` (cursor, 20 per page) and `GET /api/complaints/[id]` shaped by viewer: owner / staff (`complaints.manage`, plus `confidential.view` for confidential) / public. Anyone else gets 404.
+- [x] `GET /api/config`: active categories, blocks and emergency contacts for the form and feed filters
+- [ ] **Real storage backend (blocked on D2).** `src/lib/server/storage.ts` has only a local-disk backend (`.data/uploads`, HMAC-signed `/api/files/...` URLs, 10 min) that works with the emulators. Off emulators, uploads return 503 and the complaint is still saved. Swap in R2 or Supabase Storage there.
 
 Client
-- [ ] Guided New Complaint form (Phase 1 pattern), local draft persistence, visibility review step with public-photo notice
-- [ ] My complaints list + detail with timeline
-- [ ] Public feed: client SDK on `publicComplaints`, paginated (page size ≤ 20), filters (category, status, block), tabs (Trending, Unresolved, Recently resolved, Most supported), title search (prefix/keyword-token field. No full-text service, which keeps it zero-cost.)
+- [x] Guided form `/new`: Category (with emergency notice and critical warning) → Location → Details → Visibility and photos (public-photo notice) → Review. Draft and idempotency key persist in localStorage; photos upload after the complaint is saved, so a failed photo never loses the complaint. Big photos are downscaled in the browser first (keeps requests under Vercel's 4.5 MB body limit).
+- [x] `/mine` list and `/complaints/[id]` detail (private details panel for owner/staff, photos, add photos, history timeline)
+- [x] Feed `/`: client SDK on `publicComplaints`, 20 per page with "Show more", tabs Trending (open, most support) / Unresolved / Recently resolved / Most supported, filters category + block, title keyword search. *Changed from plan:* the status filter is replaced by the open/resolved tabs, which keeps the index count down. Search ignores tabs and filters. No feed thumbnails (each would need a signed URL).
 
 Indexes & rules
-- [ ] `firestore.indexes.json` for feed/filter queries (PRD §10.2)
-- [ ] Rules: `publicComplaints` readable by authenticated users whose `users/{uid}.active == true`
+- [x] `firestore.indexes.json`: reporter list, search, and per-field (open | categoryId | blockId) × (createdAt | updatedAt | supportCount) indexes so Firestore can merge equality filters. The emulator doesn't enforce indexes, so check the first real deploy for "missing index" errors.
+- [x] Rules: `publicComplaints` get/list only for users whose `users/{uid}.active == true`, list capped at `limit <= 20`. Everything else stays denied.
 
 Tests
-- [ ] Unit: priority, deadlines, routing (FR-06), location label, public projection never contains private keys (assert on key set)
-- [ ] Security: student B can't fetch student A's private complaint/attachment by ID; confidential complaint absent from feed and search; malformed/oversized/SVG uploads rejected
-- [ ] FR-03, FR-04, FR-05, FR-06
+- [x] Unit (complaint.test.ts): priority, deadlines, routing (FR-06), location label, public projection key set, search tokens, defaults pass their schemas
+- [x] Rules: active/inactive/unknown/signed-out reads, page-size cap, no client writes; config collections in deny-all
+- [x] Integration (complaints.test.ts, 14): FR-03/FR-05 (ticket, event, audit, projection without private data), sequential IDs + idempotent retry, fallback routing, critical escalation, urgent flag ignored, config-validation errors, 5/h limit, confidential absent from feed and 404 to others, public shape for others, `mine` only own, EXIF stripped + WebP + signed URL + forged signature 403, SVG/disguised/corrupt/oversized rejected (FR-04), 3-photo cap and owner-only upload, private photos on confidential complaints, config admin 403/400/200 + audit
+- [x] Browser check (emulators): full guided submit with a critical subcategory, a photo and a rejected SVG; draft cleared after submit; detail with signed photo; second student sees only the public complaint in feed/filters/search, 404 on the confidential one, empty "Mine"; admin edits a category and sees validation errors. Console clean.
 
-**Exit (PRD Phase 2):** submit → view → track works with no cross-account leakage.
+**Exit (PRD Phase 2):** ✅ submit → view → track works with no cross-account leakage (on emulators). Photo storage in a deployed environment waits on D2.
 
 ---
 
@@ -357,6 +362,7 @@ Email/WhatsApp/SMS, PWA install, maps, staff accounts, multi-hostel, institution
 ## Change log
 
 - 2026-10-21: Plan created from PRD v1.0.
+- 2026-10-22: Phase 3 landed: config + admin setup screen, complaint submit/route/escalate, photo pipeline (local storage backend until D2), My complaints, detail, public feed, rules + indexes. sharp added as a direct dependency. Fixed `route()` swallowing Next's prerender bail-out (now `unstable_rethrow`), and wrapped `RequireAuth` in Suspense so dynamic routes build.
 - 2026-10-22: Phase 2 landed: roster, activation, login, roles, audit, rate limits; admin roster UI. tsx added for scripts.
 - 2026-10-22: Dark mode darkened to blue-black.
 - 2026-10-21: Phase 1 design system landed (radix-ui, lucide-react, clsx). Gallery at `/dev/design`.

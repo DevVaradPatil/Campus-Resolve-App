@@ -23,6 +23,7 @@ export function EmergencyNotice({ contacts }: { contacts: EmergencyContact[] }) 
   return (
     <Banner tone="danger" icon={Phone} title="In an emergency, call. Don't file a complaint.">
       <p>Nobody may see a complaint for hours.</p>
+      {!contacts.length && <p>Call campus security or the health centre directly.</p>}
       <ul className="mt-2 flex flex-col gap-1">
         {contacts.map((c) => (
           <li key={c.label}>

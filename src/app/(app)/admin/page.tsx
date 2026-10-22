@@ -1,4 +1,4 @@
-import { ChevronRight, Users } from "lucide-react";
+import { ChevronRight, Settings2, Users } from "lucide-react";
 import Link from "next/link";
 import { Panel, RuledList } from "@/components/ui/surface";
 
@@ -10,6 +10,12 @@ const SECTIONS = [
     icon: Users,
     title: "Roster and accounts",
     body: "Import the roster, hand out activation codes, reset passwords and manage roles.",
+  },
+  {
+    href: "/admin/config",
+    icon: Settings2,
+    title: "Hostel setup",
+    body: "Categories and priorities, blocks and floors, contacts and complaint routing.",
   },
 ];
 

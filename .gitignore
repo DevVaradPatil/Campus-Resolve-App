@@ -52,3 +52,6 @@ service-account*.json
 
 # local tooling
 .claude/launch.json
+
+# local photo storage (emulator dev only)
+.data/

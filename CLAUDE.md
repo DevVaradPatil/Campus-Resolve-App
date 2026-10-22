@@ -19,6 +19,7 @@ npm run lint ; npm run typecheck ; npx prettier --check .
 npm test               # Vitest unit tests under src/ (no emulators)
 npm run test:emu       # tests/ (rules + integration, serial); starts its own emulators, so stop `npm run emulators` first (port clash)
 npm run create-admin -- <handle> "<Name>"   # admin-namespace account in whatever .env.local points at (hidden password prompt)
+npm run seed-dev       # PRD default categories + placeholder blocks/contacts/routing into the running emulators
 npx vitest run src/lib/domain/lifecycle.test.ts -t "reopen"   # single unit test
 npx firebase emulators:exec --only auth,firestore --project demo-campusresolve "npx vitest run tests/rules/deny-all.test.ts"   # single emulator test
 ```
@@ -41,7 +42,7 @@ Stack: Next.js App Router + TypeScript (strict), Tailwind, Firebase Auth (custom
 - **Sessions:** the Firebase client SDK holds the session, and the client sends `Authorization: Bearer <ID token>` via `api()` in `src/lib/client/api.ts`. Signed-in screens are client components behind `RequireAuth`. Never put authenticated data in server-rendered output. Every account change that should end sessions calls `revokeSessions()`.
 - **Audit:** every state-changing server function writes `writeAudit()` in the same transaction/batch. Audit meta never contains passwords, codes, tokens or complaint bodies.
 - **Scheduled work** (deadline escalation, reminders, auto-close) runs in the secret-protected `POST /api/cron/sweep`, triggered by GitHub Actions. It must be idempotent and bounded.
-- **Uploads:** check magic bytes (JPEG/PNG/WebP only), re-encode with `sharp` to strip EXIF, use server-generated object keys, and serve private images only via short-lived signed URLs.
+- **Uploads:** all object storage goes through `src/lib/server/storage.ts` (local-disk backend under `.data/uploads` until D2 picks a provider). Check magic bytes (JPEG/PNG/WebP only), re-encode with `sharp` to strip EXIF, use server-generated object keys, and serve private images only via short-lived signed URLs.
 - **Quota-aware:** paginate everything (≤20 per page), keep listeners scoped to visible records, and read dashboards from pre-aggregated `stats` docs. On failure, surface a clear error and never drop a submission.
 
 ## UI conventions
