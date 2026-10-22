@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckCircle2 } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { IssueRow, QueueMeta } from "@/components/issue";
 import { EmptyState, ServiceUnavailable } from "@/components/ui/feedback";
@@ -30,7 +31,11 @@ export default function CommitteePage() {
         <h1 className="text-2xl font-bold">Committee</h1>
         <p className="text-muted">
           Public complaints that passed their handling target or were escalated. Open one to
-          escalate it to the hostel lead.
+          escalate it to the hostel lead. Reported content is in{" "}
+          <Link href="/moderation" className="text-ink underline underline-offset-2">
+            Moderation
+          </Link>
+          .
         </p>
       </header>
       {error && <ServiceUnavailable />}

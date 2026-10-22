@@ -15,7 +15,7 @@ admin workflow & escalation → dashboards & notifications → hardening & recov
 | 2 | Foundation: roster, auth, roles, audit | ✅ Done (security review in Phase 7) |
 | 3 | Complaint core: submit, route, upload, feed | ✅ Done on emulators (Supabase bucket check is in the Phase 0 spike) |
 | 4 | Workflow: assign, status, deadlines, escalate, resolve, close, reopen | ✅ Done (reminders/notifications move to Phase 5) |
-| 5 | Community & notifications | 🟨 Notifications, support, comments done; reports and duplicates next |
+| 5 | Community & notifications | ✅ Done (follow-complaints skipped, optional) |
 | 6 | Dashboards, contacts, analytics, export | ⬜ Not started |
 | 7 | Hardening & recovery | ⬜ Not started |
 | 8 | Deploy & pilot | ⬜ Not started |
@@ -264,9 +264,9 @@ Tests
 
 - [x] Support ("Affects me too"): `complaints/{id}/votes/{uid}` toggled in a transaction (`POST /api/complaints/[id]/support`), `supportCount` incremented on the internal and public docs together, audited, 30 changes/10 min. Only public, visible complaints, and not your own.
 - [x] Comments: `complaints/{id}/comments` via `GET/POST /api/complaints/[id]/comments` (20 per page, newest first), 2–1000 chars, 10/10 min, plain text (React escapes), shown under the pseudonym ("Hostel admin" for admins; "(reporter)" marked). Audit records the comment id, never the text. Reporter is notified; on confidential complaints the thread is reporter ↔ admins and admins are notified without content. Moderators (`content.moderate`: committee, admin) hide with a reason; hidden comments stay visible to moderators only.
-- [ ] Report content (complaint/comment/image) → moderation queue. Committee/admin resolve the report: hide, keep, or unpublish image without deleting the complaint (§11.3).
-- [ ] Pseudonyms: consistent per-user alias generated at activation. Admin can force the generic "A resident" label.
-- [ ] Duplicates: student "report as duplicate of…"; admin links duplicate → primary in a transaction. Both histories preserved, support counts aggregated on the primary, confidential reporter's identity and attachments never exposed through the link (FR-08).
+- [x] Report content (`POST /api/reports`, 10/h): complaint, comment or photo, with a reason (personal info, harassment, inappropriate photo, spam, duplicate, other) and optional note. One report per person per thing (`reports/{hash}`), audited. Moderation queue `/moderation` (`GET /api/moderation`, `content.moderate`; committee never sees reports on confidential complaints) with previews; **Hide** hides the complaint (via the lifecycle), hides the comment, or unpublishes the photo (complaint untouched, owner still sees it), **Keep** closes the report. All open reports on the same thing resolve together. Who reported is never shown.
+- [x] Pseudonyms: consistent alias from activation (Phase 2). Staff can switch a complaint to the generic "A resident" (`anonymize` action, internal event, public doc updated).
+- [x] Duplicates: residents flag one via a "Duplicate" report (note says which ticket); staff merge with the `duplicate` action (`primaryTicketId`) in one transaction: the duplicate closes with `closureReason: "duplicate"` + `duplicateOf`, the primary gets the duplicate's support + 1 and a `duplicate_linked` event. Both histories stay. Each side names the other's ticket only if that side is public; viewers who can't see the primary get "merged with another report" (FR-08). *Simplification:* counts are added, so someone who supported both counts twice.
 - [x] Notifications: who hears what is the pure `notificationsFor()` (`src/lib/domain/notifications.ts`); `notify.ts` writes them **in the same transaction** as the change (`writeTransition`, `createComplaint`). Doc id = hash(type + ticket + recipient + hour bucket), so repeats within the hour collapse into one. Creation is separate from delivery, so email can be added later.
   - [x] Reporter: assigned, work started, admin notes, resolved ("Is it fixed?", essential), auto-closed, escalated, hidden. Admins: new complaint (critical ones are essential and titled "Critical"), reopened, escalated. The actor is never notified of their own action.
   - [x] Sweep: reminder to the reporter ~12 h before auto-close, once per resolution (`notifyOnce`). Overdue escalations notify admins and the reporter.
@@ -277,9 +277,13 @@ Tests
 - [x] Preference: "Only important notifications" switch on `/more` (`POST /api/me/preferences`, audited). Muting filters the view and the badge; nothing is dropped.
 - [ ] Optional if capacity permits: follow complaints (not a launch blocker)
 
-Tests: FR-08, FR-09, FR-10, FR-13. Rules test confirms a user can read only their own notifications.
+Tests
+- [x] Unit: `notificationsFor` (recipients, essential flag, no actor, confidential previews empty, dedupe key)
+- [x] Rules: notifications readable only by their recipient, ≤20 per query, no client writes, inactive users refused
+- [x] Integration (workflow.test.ts, 33 total): FR-13 notification creation/dedupe/privacy/mark-read/reminder/mute; FR-09 one vote per account with both counts in step, own/confidential/rate limit refused; FR-10 comments escaped, pseudonymous, length and rate limits, moderator hide, confidential thread; reports one-per-person, moderator-only queue, comment hide resolves all reports, photo unpublish keeps the complaint, confidential reports hidden from committee; FR-08 merge counts/histories/links, no confidential leak, bad merges refused; generic name
+- [x] Browser check (emulators): notifications badge → page → mark all read → mute; second student supports (aria-pressed, count 0→1), comments (HTML shown as text), reports; admin moderation queue → Keep. All API calls 200.
 
-**Exit (PRD Phase 3, part 2):** community features and notifications pass permission tests.
+**Exit (PRD Phase 3, part 2):** ✅ community features and notifications pass permission tests.
 
 ---
 
@@ -370,6 +374,7 @@ Email/WhatsApp/SMS, PWA install, maps, staff accounts, multi-hostel, institution
 ## Change log
 
 - 2026-10-21: Plan created from PRD v1.0.
+- 2026-10-22: Phase 5 slice 3: reports + moderation queue, duplicate merge, generic reporter name. Phase 5 done.
 - 2026-10-22: Phase 5 slice 2: support votes and comments with moderation.
 - 2026-10-22: Phase 5 slice 1: in-app notifications (transactional, deduped, confidential-safe), notification centre, mute preference, pre-closure reminder.
 - 2026-10-22: Phase 4 landed: lifecycle module, action route, sweep + GitHub cron, admin queue, committee page, feedback, audited reporter lookup.

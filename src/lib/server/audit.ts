@@ -23,13 +23,15 @@ export type AuditAction =
   | "complaint.support"
   | "comment.create"
   | "comment.hide"
+  | "report.create"
+  | "report.resolve"
   | `complaint.${WorkflowInput["type"] | "auto_close" | "reporter_view"}`
   | "attachment.upload";
 
 export type AuditEntry = {
   actorUid: string | null;
   action: AuditAction;
-  target: { type: "user" | "roster" | "system" | "config" | "complaint"; id: string };
+  target: { type: "user" | "roster" | "system" | "config" | "complaint" | "report"; id: string };
   outcome: "success" | "failure";
   /** Minimal, non-sensitive context. Never passwords, codes, tokens or complaint bodies. */
   meta?: Record<string, string | number | boolean | null>;

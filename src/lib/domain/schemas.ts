@@ -161,6 +161,15 @@ export const workflowInput = z.discriminatedUnion("type", [
   z.object({ type: z.literal("hide"), reason }),
   z.object({ type: z.literal("unhide") }),
   z.object({ type: z.literal("confirm") }),
+  z.object({
+    type: z.literal("duplicate"),
+    primaryTicketId: z
+      .string()
+      .trim()
+      .toUpperCase()
+      .regex(/^CR-\d{6}$/, "Use a ticket number like CR-000123."),
+  }),
+  z.object({ type: z.literal("anonymize") }),
   z.object({ type: z.literal("reopen"), note: optionalText(1000) }),
   z.object({
     type: z.literal("feedback"),
@@ -203,3 +212,27 @@ export const commentInput = z.object({
   body: z.string().trim().min(2, "Write a little more.").max(COMMENT_MAX),
 });
 export const hideCommentInput = z.object({ reason });
+
+// --- Reports and moderation (PRD §11.3, §12.3) ---
+
+export const REPORT_REASONS = {
+  personal_info: "Names someone or shares private details",
+  harassment: "Harassment or abuse",
+  inappropriate_photo: "Inappropriate photo",
+  spam: "Spam or not a real complaint",
+  duplicate: "Duplicate of another complaint",
+  other: "Something else",
+} as const;
+export type ReportReason = keyof typeof REPORT_REASONS;
+
+const itemId = z.string().regex(/^\w{1,40}$/);
+export const reportInput = z.object({
+  complaintId: z.string().regex(/^[a-f0-9]{20}$/),
+  commentId: itemId.optional(),
+  photoId: itemId.optional(),
+  reason: z.enum(Object.keys(REPORT_REASONS) as [ReportReason, ...ReportReason[]]),
+  note: optionalText(300),
+});
+export type ReportInput = z.infer<typeof reportInput>;
+
+export const resolveReportInput = z.object({ action: z.enum(["keep", "hide"]) });

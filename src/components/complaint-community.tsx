@@ -1,17 +1,17 @@
 "use client";
 
-import { EyeOff, MessageSquare, ThumbsUp } from "lucide-react";
+import { EyeOff, Flag, MessageSquare, ThumbsUp } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Pseudonym, Tag } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Banner, EmptyState } from "@/components/ui/feedback";
-import { Field, Input, Textarea } from "@/components/ui/field";
+import { Field, Input, Radio, Textarea } from "@/components/ui/field";
 import { Dialog, DialogContent } from "@/components/ui/overlay";
 import { Skeleton } from "@/components/ui/spinner";
 import { LoadMore, Panel, RuledList } from "@/components/ui/surface";
 import { useToast } from "@/components/ui/toast";
 import { api, ApiError } from "@/lib/client/api";
-import { COMMENT_MAX } from "@/lib/domain/schemas";
+import { COMMENT_MAX, REPORT_REASONS, type ReportReason } from "@/lib/domain/schemas";
 import { formatDateTime } from "@/lib/format";
 import type { CommentView } from "@/lib/server/community";
 import type { ComplaintView } from "@/lib/server/complaints";
@@ -118,7 +118,7 @@ export function Comments({ c }: { c: ComplaintView }) {
                     )}
                   </div>
                   <p className="max-w-prose whitespace-pre-wrap">{m.body}</p>
-                  {page.canModerate && !m.hidden && (
+                  {page.canModerate && !m.hidden ? (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -127,6 +127,8 @@ export function Comments({ c }: { c: ComplaintView }) {
                     >
                       Hide comment
                     </Button>
+                  ) : (
+                    !m.mine && <ReportButton complaintId={c.id} commentId={m.id} what="comment" />
                   )}
                 </li>
               ))}
@@ -218,5 +220,94 @@ export function Comments({ c }: { c: ComplaintView }) {
         </DialogContent>
       </Dialog>
     </Panel>
+  );
+}
+
+/** "Report" link + dialog for a complaint, comment or photo. Goes to the moderation queue. */
+export function ReportButton({
+  complaintId,
+  commentId,
+  photoId,
+  what,
+}: {
+  complaintId: string;
+  commentId?: string;
+  photoId?: string;
+  what: string;
+}) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState<ReportReason>();
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="sm"
+        className="self-start text-muted"
+        icon={<Flag aria-hidden className="size-4" />}
+        onClick={() => setOpen(true)}
+      >
+        Report {what}
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent
+          title={`Report this ${what}`}
+          description="Moderators from the hostel committee or admin team will look at it. They won't see who reported it in the app."
+        >
+          <form
+            className="flex flex-col gap-4"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!reason) return;
+              setBusy(true);
+              setError(undefined);
+              try {
+                await api("/api/reports", {
+                  method: "POST",
+                  body: { complaintId, commentId, photoId, reason, note: note || null },
+                });
+                setOpen(false);
+                toast({ title: "Reported. Thanks for flagging it." });
+              } catch (err) {
+                setError((err as Error).message);
+              }
+              setBusy(false);
+            }}
+          >
+            <fieldset>
+              <legend className="mb-1 font-semibold">What&apos;s wrong?</legend>
+              {Object.entries(REPORT_REASONS)
+                .filter(([k]) => (photoId ? true : k !== "inappropriate_photo"))
+                .map(([k, label]) => (
+                  <Radio
+                    key={k}
+                    name="reason"
+                    label={label}
+                    checked={reason === k}
+                    onChange={() => setReason(k as ReportReason)}
+                  />
+                ))}
+            </fieldset>
+            <Field
+              label="Anything to add?"
+              hint={
+                reason === "duplicate"
+                  ? "Say which ticket it duplicates, e.g. CR-000012."
+                  : undefined
+              }
+            >
+              <Input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} />
+            </Field>
+            {error && <Banner tone="danger" title={error} />}
+            <Button type="submit" className="self-end" disabled={!reason} loading={busy}>
+              Send report
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

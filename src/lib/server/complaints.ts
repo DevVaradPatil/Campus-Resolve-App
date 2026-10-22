@@ -209,6 +209,8 @@ export type ComplaintView = {
   actions: WorkflowInput["type"][];
   /** Staff only: who it can be assigned to. */
   assignees: { id: string; name: string }[];
+  /** Set when merged as a duplicate. The primary is named only if this viewer can see it. */
+  mergedInto: { id: string; ticketId: string } | "hidden" | null;
   /** "Affects me too" state for this viewer. */
   support: { supported: boolean; canSupport: boolean };
 };
@@ -224,12 +226,14 @@ export async function getComplaint(user: SessionUser, id: string): Promise<Compl
   const privileged = viewer !== "public";
 
   const staff = viewer === "staff";
-  const [events, attachments, cfg, vote] = await Promise.all([
+  const [events, attachments, cfg, vote, primary] = await Promise.all([
     ref.collection("events").orderBy("at").get(),
     ref.collection("attachments").orderBy("createdAt").get(),
     staff || c.assignedContactId ? loadConfig() : null,
     ref.collection("votes").doc(user.uid).get(),
+    c.duplicateOf ? db.doc(`complaints/${c.duplicateOf}`).get() : null,
   ]);
+  const p = primary?.data() as ComplaintDoc | undefined;
   const contacts = cfg?.contacts ?? [];
   const visible = attachments.docs.filter((d) => {
     const a = d.data() as AttachmentDoc;
@@ -315,6 +319,11 @@ export async function getComplaint(user: SessionUser, id: string): Promise<Compl
       ? contacts.filter((x) => x.active).map((x) => ({ id: x.id, name: x.name }))
       : [],
     support: { supported: vote.exists, canSupport: canSupport(user, c) },
+    mergedInto: !c.duplicateOf
+      ? null
+      : p && viewerOf(user, p)
+        ? { id: c.duplicateOf, ticketId: p.ticketId }
+        : "hidden",
   };
 }
 

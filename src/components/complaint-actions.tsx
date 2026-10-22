@@ -214,6 +214,7 @@ function StaffActions({ c, onChanged }: { c: ComplaintView; onChanged: () => Pro
   const [priorityWhy, setPriorityWhy] = useState("");
   const [hideWhy, setHideWhy] = useState("");
   const [escalateWhy, setEscalateWhy] = useState("");
+  const [primary, setPrimary] = useState("");
   const [reporter, setReporter] = useState<{
     name: string;
     rollNumber: string | null;
@@ -383,6 +384,44 @@ function StaffActions({ c, onChanged }: { c: ComplaintView; onChanged: () => Pro
               Escalate
             </Button>
           </Row>
+        )}
+
+        {has("duplicate") && (
+          <Row>
+            <Field
+              label="Merge into another complaint"
+              className="flex-1"
+              hint="For the same problem reported twice. This one closes; its support moves to the other."
+            >
+              <Input
+                value={primary}
+                maxLength={9}
+                placeholder="CR-000123"
+                onChange={(e) => setPrimary(e.target.value)}
+              />
+            </Field>
+            <Button
+              variant="secondary"
+              disabled={!/^cr-\d{6}$/i.test(primary.trim())}
+              loading={busy === "duplicate"}
+              onClick={async () =>
+                (await run({ type: "duplicate", primaryTicketId: primary.trim() }, "Merged")) &&
+                setPrimary("")
+              }
+            >
+              Merge
+            </Button>
+          </Row>
+        )}
+        {has("anonymize") && (
+          <Button
+            variant="ghost"
+            className="self-start"
+            loading={busy === "anonymize"}
+            onClick={() => run({ type: "anonymize" }, "Now shown as “A resident”")}
+          >
+            Show the reporter as &ldquo;A resident&rdquo;
+          </Button>
         )}
 
         {has("hide") && (

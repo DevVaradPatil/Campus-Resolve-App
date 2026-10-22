@@ -5,12 +5,12 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { ComplaintActions } from "@/components/complaint-actions";
-import { Comments, SupportButton } from "@/components/complaint-community";
+import { Comments, ReportButton, SupportButton } from "@/components/complaint-community";
 import { LocationPath, StatusTimeline } from "@/components/issue";
 import { EmergencyNotice, PublicPhotoNotice } from "@/components/notices";
 import { EscalatedBadge, PriorityBadge, StatusBadge, Tag, TicketId } from "@/components/ui/badge";
 import { buttonClass } from "@/components/ui/button";
-import { EmptyState, ServiceUnavailable } from "@/components/ui/feedback";
+import { Banner, EmptyState, ServiceUnavailable } from "@/components/ui/feedback";
 import { Thumbnail, UploadDropzone, type UploadItem } from "@/components/ui/media";
 import { Skeleton } from "@/components/ui/spinner";
 import { Panel } from "@/components/ui/surface";
@@ -115,7 +115,10 @@ export default function ComplaintPage() {
           </span>
         </p>
         <LocationPath parts={c.location} />
-        <SupportButton c={c} />
+        <div className="flex flex-wrap items-center gap-2">
+          <SupportButton c={c} />
+          {c.viewer === "public" && <ReportButton complaintId={c.id} what="complaint" />}
+        </div>
         {c.workflow.assignee && (
           <p className="text-sm">
             Assigned to <span className="font-semibold">{c.workflow.assignee}</span>
@@ -129,6 +132,27 @@ export default function ComplaintPage() {
           </p>
         )}
       </header>
+
+      {c.mergedInto && (
+        <Banner tone="info" title="Merged with another report">
+          This was reported more than once, so it&apos;s being handled{" "}
+          {c.mergedInto === "hidden" ? (
+            "on another complaint."
+          ) : (
+            <>
+              on{" "}
+              <Link
+                href={`/complaints/${c.mergedInto.id}`}
+                className="font-semibold text-ink underline"
+              >
+                {c.mergedInto.ticketId}
+              </Link>
+              .
+            </>
+          )}{" "}
+          Its history is kept here.
+        </Banner>
+      )}
 
       <ComplaintActions c={c} onChanged={load} />
 
@@ -172,6 +196,9 @@ export default function ComplaintPage() {
                 {c.photos.map((p, i) => (
                   <li key={p.id}>
                     <Thumbnail src={p.url} alt={`Photo ${i + 1} attached to ${c.ticketId}`} />
+                    {c.viewer === "public" && (
+                      <ReportButton complaintId={c.id} photoId={p.id} what="photo" />
+                    )}
                   </li>
                 ))}
               </ul>

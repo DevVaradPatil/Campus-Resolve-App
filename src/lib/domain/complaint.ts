@@ -149,7 +149,9 @@ export type ComplaintRecord<T> = {
   resolutionNote: string | null;
   confirmationDeadline: T | null;
   closedAt: T | null;
-  closureReason: "student_confirmed" | "confirmation_window_expired" | null;
+  closureReason: "student_confirmed" | "confirmation_window_expired" | "duplicate" | null;
+  /** Primary complaint id when this one was merged as a duplicate (FR-08). */
+  duplicateOf?: string | null;
   feedback: { rating: number; comment: string | null } | null;
   createdAt: T;
   updatedAt: T;

@@ -1,4 +1,5 @@
 import { Timestamp } from "firebase-admin/firestore";
+import sharp from "sharp";
 import { beforeEach, describe, expect, it } from "vitest";
 import { GET as queueRoute } from "@/app/api/admin/complaints/route";
 import { GET as committeeRoute } from "@/app/api/committee/complaints/route";
@@ -9,7 +10,11 @@ import { POST as supportRoute } from "@/app/api/complaints/[id]/support/route";
 import { GET as reporterRoute } from "@/app/api/complaints/[id]/reporter/route";
 import { GET as viewRoute } from "@/app/api/complaints/[id]/route";
 import { POST as createRoute } from "@/app/api/complaints/route";
+import { POST as photoRoute } from "@/app/api/complaints/[id]/photos/route";
 import { POST as cronRoute } from "@/app/api/cron/sweep/route";
+import { POST as moderationPost } from "@/app/api/moderation/[reportId]/route";
+import { GET as moderationGet } from "@/app/api/moderation/route";
+import { POST as reportRoute } from "@/app/api/reports/route";
 import { POST as prefsRoute } from "@/app/api/me/preferences/route";
 import { POST as markReadRoute } from "@/app/api/notifications/read/route";
 import { DEFAULT_CATEGORIES, DEV_BLOCKS, DEV_CONTACTS, DEV_ROUTING } from "@/lib/domain/defaults";
@@ -518,5 +523,164 @@ describe("comments (FR-10)", () => {
       .map((d) => d.data())
       .find((n) => n.type === "comment");
     expect(toAdmin?.body).toBeNull();
+  });
+});
+
+describe("reports and moderation (§11.3)", () => {
+  const report = async (token: string, body: Record<string, unknown>) =>
+    (
+      await reportRoute(
+        await authedRequest(token, "http://localhost/api/reports", {
+          method: "POST",
+          body: JSON.stringify(body),
+        }),
+        undefined as never,
+      )
+    ).status;
+  const queue = async (token: string) => {
+    const res = await moderationGet(await authedRequest(token), undefined as never);
+    return { status: res.status, body: await res.json() };
+  };
+  const resolve = async (token: string, reportId: string, action: "keep" | "hide") =>
+    (
+      await moderationPost(
+        await authedRequest(token, "http://localhost/api/x", {
+          method: "POST",
+          body: JSON.stringify({ action }),
+        }),
+        { params: Promise.resolve({ reportId }) },
+      )
+    ).status;
+
+  it("queues one report per person per thing; only moderators can see or act", async () => {
+    const id = await create(alice);
+    expect(await report(bob, { complaintId: id, reason: "spam" })).toBe(200);
+    expect(await report(bob, { complaintId: id, reason: "other", note: "changed my mind" })).toBe(
+      200,
+    );
+    expect((await adminDb.collection("reports").get()).size).toBe(1);
+    expect((await queue(alice)).status).toBe(403);
+    const { body } = await queue(committee);
+    expect(body.items).toHaveLength(1);
+    expect(body.items[0]).toMatchObject({ targetType: "complaint", ticketId: "CR-000001" });
+    expect(JSON.stringify(body)).not.toMatch(/Ravi|231002/); // who reported stays private
+    expect(await resolve(alice, body.items[0].id, "hide")).toBe(403);
+  });
+
+  it("hiding a reported comment resolves every report on it", async () => {
+    const id = await create(alice);
+    await commentsPost(
+      await authedRequest(bob, "http://localhost/api/x", {
+        method: "POST",
+        body: JSON.stringify({ body: "Rude remark" }),
+      }),
+      { params: Promise.resolve({ id }) },
+    );
+    const commentId = (await adminDb.collection(`complaints/${id}/comments`).get()).docs[0].id;
+    await report(alice, { complaintId: id, commentId, reason: "harassment" });
+    await report(committee, { complaintId: id, commentId, reason: "harassment" });
+    const { body } = await queue(adminToken);
+    expect(await resolve(committee, body.items[0].id, "hide")).toBe(200);
+    const hidden = (await adminDb.doc(`complaints/${id}/comments/${commentId}`).get()).get(
+      "hidden",
+    );
+    expect(hidden).toBe(true);
+    const statuses = (await adminDb.collection("reports").get()).docs.map((d) => d.get("status"));
+    expect(statuses).toEqual(["resolved", "resolved"]);
+    expect(await audits()).toContain("report.resolve");
+  });
+
+  it("unpublishes a reported photo without touching the complaint", async () => {
+    const id = await create(alice);
+    const img = await sharp({ create: { width: 8, height: 8, channels: 3, background: "#888" } })
+      .jpeg()
+      .toBuffer();
+    const form = new FormData();
+    form.append("photo", new File([new Uint8Array(img)], "p.jpg", { type: "image/jpeg" }));
+    await photoRoute(
+      await authedRequest(alice, "http://localhost/api/x", { method: "POST", body: form }),
+      { params: Promise.resolve({ id }) },
+    );
+    const photoId = (await adminDb.collection(`complaints/${id}/attachments`).get()).docs[0].id;
+    expect((await view(bob, id)).photos).toHaveLength(1);
+    await report(bob, { complaintId: id, photoId, reason: "inappropriate_photo" });
+    const { body } = await queue(adminToken);
+    expect(body.items[0].preview.photoUrl).toBeTruthy();
+    expect(await resolve(adminToken, body.items[0].id, "hide")).toBe(200);
+    expect((await view(bob, id)).photos).toHaveLength(0);
+    expect((await view(alice, id)).photos).toHaveLength(1);
+    expect(await pub(id)).toBeTruthy();
+  });
+
+  it("keeps reports about confidential complaints away from the committee", async () => {
+    const id = await create(alice, { visibility: "confidential" });
+    expect(await report(bob, { complaintId: id, reason: "spam" })).toBe(404);
+    expect(await report(alice, { complaintId: id, reason: "other", note: "wrong category" })).toBe(
+      200,
+    );
+    expect((await queue(committee)).body.items).toHaveLength(0);
+    expect((await queue(adminToken)).body.items).toHaveLength(1);
+  });
+});
+
+describe("duplicates (FR-08) and generic names", () => {
+  it("closes the duplicate, adds its support to the primary, and keeps both histories", async () => {
+    const primary = await create(alice);
+    const dup = await create(bob);
+    await supportRoute(
+      await authedRequest(committee, "http://localhost/api/x", { method: "POST" }),
+      { params: Promise.resolve({ id: dup }) },
+    );
+    const merged = await act(adminToken, dup, { type: "duplicate", primaryTicketId: "cr-000001" });
+    expect(merged.status).toBe(200);
+    expect(await doc(dup)).toMatchObject({
+      status: "closed",
+      closureReason: "duplicate",
+      duplicateOf: primary,
+    });
+    expect((await doc(primary)).supportCount).toBe(2); // the dup's reporter + its supporter
+    expect((await pub(primary))?.supportCount).toBe(2);
+    expect((await view(bob, dup)).mergedInto).toEqual({ id: primary, ticketId: "CR-000001" });
+    const notes = (await adminDb.collection(`complaints/${primary}/events`).get()).docs.map((d) =>
+      d.get("note"),
+    );
+    expect(notes).toContain("CR-000002 was merged into this complaint.");
+    expect((await adminDb.collection(`complaints/${dup}/events`).get()).size).toBeGreaterThan(1);
+  });
+
+  it("never reveals a confidential side through the link", async () => {
+    await create(alice, { visibility: "confidential" }); // CR-000001
+    const publicDup = await create(bob); // CR-000002
+    await act(adminToken, publicDup, { type: "duplicate", primaryTicketId: "CR-000001" });
+    const asOther = await view(committee, publicDup);
+    expect(asOther.mergedInto).toBe("hidden");
+    expect(JSON.stringify(asOther)).not.toContain("CR-000001");
+
+    const secretDup = await create(bob, { visibility: "confidential" }); // CR-000003
+    const publicPrimary = await create(alice); // CR-000004
+    await act(adminToken, secretDup, { type: "duplicate", primaryTicketId: "CR-000004" });
+    const seen = JSON.stringify(await view(committee, publicPrimary));
+    expect(seen).not.toContain("CR-000003");
+    expect(seen).toContain("Another report was merged");
+  });
+
+  it("refuses bad merges and non-staff", async () => {
+    const a = await create(alice);
+    const b = await create(bob);
+    const merge = (token: string, id: string, t: string) =>
+      act(token, id, { type: "duplicate", primaryTicketId: t });
+    expect((await merge(adminToken, a, "CR-000001")).status).toBe(400); // itself
+    expect((await merge(adminToken, a, "CR-999999")).status).toBe(400); // unknown
+    expect((await merge(bob, b, "CR-000001")).status).toBe(403);
+    await merge(adminToken, b, "CR-000001");
+    const c = await create(committee);
+    expect((await merge(adminToken, c, "CR-000002")).status).toBe(400); // into a duplicate
+  });
+
+  it("lets admins replace the pseudonym with a generic name", async () => {
+    const id = await create(alice);
+    expect((await act(adminToken, id, { type: "anonymize" })).status).toBe(200);
+    expect((await pub(id))?.reporterLabel).toBe("A resident");
+    expect((await act(adminToken, id, { type: "anonymize" })).status).toBe(409);
   });
 });

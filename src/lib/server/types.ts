@@ -3,6 +3,7 @@ import type { Timestamp } from "firebase-admin/firestore";
 import type { ComplaintRecord, Status } from "@/lib/domain/complaint";
 import type { EventType } from "@/lib/domain/lifecycle";
 import type { Role } from "@/lib/domain/permissions";
+import type { ReportReason } from "@/lib/domain/schemas";
 
 // Firestore document shapes. None of these are client-readable.
 
@@ -77,6 +78,23 @@ export type CommentDoc = {
   hidden: boolean;
   hiddenReason: string | null;
   createdAt: Timestamp;
+};
+
+/** reports/{hash(reporter + target)}: one report per person per thing (PRD §11.3, §12.3). */
+export type ReportDoc = {
+  targetKey: string;
+  target: { type: "complaint" | "comment" | "photo"; complaintId: string; itemId: string | null };
+  ticketId: string;
+  /** Committee moderators never see reports about confidential complaints. */
+  confidential: boolean;
+  reason: ReportReason;
+  note: string | null;
+  reporterUid: string;
+  status: "open" | "resolved";
+  resolution: "kept" | "hidden" | null;
+  resolvedBy: string | null;
+  createdAt: Timestamp;
+  resolvedAt: Timestamp | null;
 };
 
 /** complaints/{id}/attachments/{attachmentId}. Bytes live in object storage under `key`. */

@@ -27,7 +27,17 @@ export const clock = (now = Date.now()) => ({
 });
 
 type ActionType = WorkflowInput["type"];
-const STAFF: ActionType[] = ["assign", "start", "note", "resolve", "priority", "hide", "unhide"];
+const STAFF: ActionType[] = [
+  "assign",
+  "start",
+  "note",
+  "resolve",
+  "priority",
+  "hide",
+  "unhide",
+  "duplicate",
+  "anonymize",
+];
 const OWNER: ActionType[] = ["confirm", "reopen", "feedback"];
 
 /** Server-side role check (FR-07). `viewer` already encodes confidential access. */
@@ -51,7 +61,8 @@ function toAction(input: WorkflowInput, c: ComplaintDoc, cfg: HostelConfig | nul
     case "escalate":
       return { type: "escalate", reason: input.reason, by: "committee" };
     case "feedback":
-      throw new Error("feedback is not a lifecycle action");
+    case "duplicate":
+      throw new Error(`${input.type} is handled separately`);
     default:
       return input;
   }
@@ -100,8 +111,11 @@ export async function act(user: SessionUser, id: string, input: WorkflowInput) {
     adminUids(),
   ]);
   const ref = db.doc(`complaints/${id}`);
+  const primaryRef =
+    input.type === "duplicate" ? await findPrimary(id, input.primaryTicketId) : null;
   await db.runTransaction(async (tx) => {
-    const c = (await tx.get(ref)).data() as ComplaintDoc | undefined;
+    const [snap, primarySnap] = await tx.getAll(ref, ...(primaryRef ? [primaryRef] : []));
+    const c = snap.data() as ComplaintDoc | undefined;
     const viewer = c && viewerOf(user, c);
     if (!c || !viewer) throw notFound();
     if (!allowed(user, viewer, input.type)) throw forbidden();
@@ -121,6 +135,11 @@ export async function act(user: SessionUser, id: string, input: WorkflowInput) {
       return;
     }
 
+    if (input.type === "duplicate") {
+      const p = primarySnap.data() as ComplaintDoc;
+      return mergeDuplicate(tx, user, { id, c }, { id: primarySnap.id, c: p }, admins);
+    }
+
     let result;
     try {
       result = applyAction(c, toAction(input, c, cfg), clock());
@@ -129,6 +148,67 @@ export async function act(user: SessionUser, id: string, input: WorkflowInput) {
       throw e;
     }
     writeTransition(tx, id, c, result, user.uid, `complaint.${input.type}`, admins);
+  });
+}
+
+async function findPrimary(id: string, ticketId: string) {
+  const q = await db.collection("complaints").where("ticketId", "==", ticketId).limit(1).get();
+  if (q.empty) throw new HttpError(400, "No complaint has that ticket number.");
+  if (q.docs[0].id === id) throw new HttpError(400, "A complaint can't duplicate itself.");
+  return q.docs[0].ref;
+}
+
+/**
+ * FR-08: closes the duplicate as merged and adds its support to the primary. Both histories stay.
+ * Neither side reveals the other when that side is confidential: notes and labels name the other
+ * ticket only if it's public, and no reporter or attachment crosses the link.
+ */
+function mergeDuplicate(
+  tx: Transaction,
+  user: SessionUser,
+  dup: { id: string; c: ComplaintDoc },
+  primary: { id: string; c: ComplaintDoc },
+  admins: string[],
+) {
+  if (!primary.c || viewerOf(user, primary.c) !== "staff")
+    throw new HttpError(400, "You can't merge into that complaint.");
+  if (primary.c.duplicateOf || primary.c.status === "closed")
+    throw new HttpError(400, "Merge into the original, open complaint.");
+  const ctx = clock();
+  let result;
+  try {
+    result = applyAction(
+      dup.c,
+      {
+        type: "duplicate",
+        primaryId: primary.id,
+        primaryLabel: primary.c.visibility === "public" ? primary.c.ticketId : "another report",
+      },
+      ctx,
+    );
+  } catch (e) {
+    if (e instanceof LifecycleError) throw new HttpError(409, e.message);
+    throw e;
+  }
+  writeTransition(tx, dup.id, dup.c, result, user.uid, "complaint.duplicate", admins);
+
+  // ponytail: counts add up, so someone who supported both is counted twice. Fine at pilot scale.
+  const now = ctx.ts(ctx.now);
+  const pPatch = { supportCount: primary.c.supportCount + dup.c.supportCount + 1, updatedAt: now };
+  const pRef = db.doc(`complaints/${primary.id}`);
+  tx.update(pRef, pPatch);
+  const pub = toPublicComplaint({ ...primary.c, ...pPatch });
+  if (pub) tx.set(db.doc(`publicComplaints/${primary.id}`), pub);
+  tx.set(pRef.collection("events").doc(), {
+    type: "duplicate_linked",
+    status: primary.c.status,
+    note:
+      dup.c.visibility === "public"
+        ? `${dup.c.ticketId} was merged into this complaint.`
+        : "Another report was merged into this complaint.",
+    internal: false,
+    actorUid: user.uid,
+    at: now,
   });
 }
 
@@ -145,6 +225,8 @@ export function availableActions(user: SessionUser, viewer: Viewer, c: Complaint
     unhide: { type: "unhide" },
     confirm: { type: "confirm" },
     reopen: { type: "reopen", note: null },
+    duplicate: { type: "duplicate", primaryId: "-", primaryLabel: "-" },
+    anonymize: { type: "anonymize" },
   };
   const out: ActionType[] = [];
   for (const [type, action] of Object.entries(dry) as [ActionType, WorkflowAction][]) {

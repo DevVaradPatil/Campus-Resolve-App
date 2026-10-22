@@ -15,6 +15,7 @@ export const LIMITS = {
   upload: { limit: 10, windowSec: 60 * 60 },
   support: { limit: 30, windowSec: 10 * 60 },
   comment: { limit: 10, windowSec: 10 * 60 },
+  report: { limit: 10, windowSec: 60 * 60 },
 } as const;
 
 type Limit = { limit: number; windowSec: number };

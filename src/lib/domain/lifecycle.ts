@@ -9,6 +9,7 @@ import {
   type Priority,
   type Status,
 } from "./complaint";
+import { GENERIC_REPORTER } from "./pseudonym";
 
 export type WorkflowAction =
   | { type: "assign"; contactId: string; contactName: string }
@@ -21,7 +22,10 @@ export type WorkflowAction =
   | { type: "unhide" }
   | { type: "confirm" }
   | { type: "reopen"; note: string | null }
-  | { type: "auto_close" };
+  | { type: "auto_close" }
+  /** `primaryLabel` is the primary's ticket only when it's safe to show (public primary). */
+  | { type: "duplicate"; primaryId: string; primaryLabel: string }
+  | { type: "anonymize" };
 
 export type EventType =
   | "created"
@@ -35,7 +39,10 @@ export type EventType =
   | "unhidden"
   | "confirmed"
   | "reopened"
-  | "auto_closed";
+  | "auto_closed"
+  | "duplicate"
+  | "duplicate_linked"
+  | "anonymized";
 
 export type LifecycleEvent = {
   type: EventType;
@@ -168,6 +175,18 @@ export function applyAction<T>(c: ComplaintRecord<T>, a: WorkflowAction, ctx: Ct
         note: a.note ?? "Reporter says it's still a problem.",
         internal: false,
       };
+      break;
+    case "duplicate":
+      need(c.status !== "closed", "Closed complaints can't be merged.");
+      need(!c.duplicateOf, "It's already merged.");
+      status = "closed";
+      patch = { closedAt: now, closureReason: "duplicate", duplicateOf: a.primaryId };
+      event = { type: "duplicate", note: `Merged into ${a.primaryLabel}.`, internal: false };
+      break;
+    case "anonymize":
+      need(c.reporterLabel !== GENERIC_REPORTER, "It already shows a generic name.");
+      patch = { reporterLabel: GENERIC_REPORTER };
+      event = { type: "anonymized", note: null, internal: true };
       break;
     case "auto_close":
       need(

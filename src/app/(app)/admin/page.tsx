@@ -1,4 +1,4 @@
-import { ChevronRight, Inbox, Settings2, Users } from "lucide-react";
+import { ChevronRight, Flag, Inbox, Settings2, Users } from "lucide-react";
 import Link from "next/link";
 import { Panel, RuledList } from "@/components/ui/surface";
 
@@ -10,6 +10,12 @@ const SECTIONS = [
     icon: Inbox,
     title: "Complaint queue",
     body: "Assign, update and resolve complaints. Overdue ones come first.",
+  },
+  {
+    href: "/moderation",
+    icon: Flag,
+    title: "Moderation",
+    body: "Review reported complaints, comments and photos.",
   },
   {
     href: "/admin/roster",
