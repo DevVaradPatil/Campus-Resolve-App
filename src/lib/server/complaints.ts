@@ -185,12 +185,21 @@ export async function getComplaint(user: SessionUser, id: string): Promise<Compl
     ref.collection("events").orderBy("at").get(),
     ref.collection("attachments").orderBy("createdAt").get(),
   ]);
-  const photos = attachments.docs
-    .filter((d) => {
-      const a = d.data() as AttachmentDoc;
-      return privileged || (a.privacy === "public" && a.publication === "published");
-    })
-    .map((d) => ({ id: d.id, url: signedUrl((d.data() as AttachmentDoc).key) }));
+  const visible = attachments.docs.filter((d) => {
+    const a = d.data() as AttachmentDoc;
+    return privileged || (a.privacy === "public" && a.publication === "published");
+  });
+  // A storage outage hides photos; the complaint itself still loads.
+  const photos = (
+    await Promise.all(
+      visible.map((d) =>
+        signedUrl((d.data() as AttachmentDoc).key).then(
+          (url) => ({ id: d.id, url }),
+          (e) => (console.error("Signing photo URL failed", e), null),
+        ),
+      ),
+    )
+  ).filter((p) => p !== null);
 
   return {
     id,
@@ -319,5 +328,5 @@ export async function addPhoto(user: SessionUser, id: string, file: File) {
     await deleteObject(key).catch(() => {});
     throw e;
   }
-  return { id: attRef.id, url: signedUrl(key) };
+  return { id: attRef.id };
 }

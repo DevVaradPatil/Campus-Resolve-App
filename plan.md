@@ -10,10 +10,10 @@ admin workflow & escalation → dashboards & notifications → hardening & recov
 
 | Phase | Name | Status |
 |---|---|---|
-| 0 | Decisions, spikes & scaffold | 🟨 Scaffold done; deployed spike waits on accounts (TODO.md) |
+| 0 | Decisions, spikes & scaffold | 🟨 Scaffold done, D1/D2 decided; deployed spike waits on Vercel import + keys (TODO.md) |
 | 1 | Design system | ✅ Done (real-phone/axe pass deferred to Phase 7) |
 | 2 | Foundation: roster, auth, roles, audit | ✅ Done (security review in Phase 7) |
-| 3 | Complaint core: submit, route, upload, feed | ✅ Done on emulators (real photo storage waits on D2) |
+| 3 | Complaint core: submit, route, upload, feed | ✅ Done on emulators (Supabase bucket check is in the Phase 0 spike) |
 | 4 | Workflow: assign, status, deadlines, escalate, resolve, close, reopen | ⬜ Not started |
 | 5 | Community & notifications | ⬜ Not started |
 | 6 | Dashboards, contacts, analytics, export | ⬜ Not started |
@@ -28,8 +28,8 @@ Legend: ⬜ not started · 🟨 in progress · ✅ done (exit criteria met)
 
 | ID | Decision | Recommended default | Why it matters |
 |---|---|---|---|
-| D1 | Hosting runtime | **Vercel Hobby, Node.js runtime** — if owner accepts Hobby terms (personal, non-commercial). Fallback: Cloudflare Workers via OpenNext. | `firebase-admin` and `sharp` run on Node out of the box. Workers would need custom-token signing via `jose`, Firestore via REST, and a non-native image pipeline — significant extra work. |
-| D2 | Image storage | **Cloudflare R2** if it can be enabled without breaking the zero-paid rule. Fallback: **Supabase Storage** (free tier, private buckets, signed URLs). | R2 asks for a payment method on file before it can be enabled (verify current terms). PRD §8.4 treats a payment-details requirement as a launch blocker. Firebase Storage now needs the Blaze plan, so it's out. All storage calls go through one server module, so changing provider stays a one-file change. |
+| D1 | Hosting runtime | ✅ **Decided 2026-10-22: Vercel Hobby, Node.js runtime.** | `firebase-admin` and `sharp` run on Node out of the box. Workers would need custom-token signing via `jose`, Firestore via REST, and a non-native image pipeline — significant extra work. |
+| D2 | Image storage | ✅ **Decided 2026-10-22: Supabase Storage** (free tier, no card, private bucket, signed URLs). R2 asked for a card. Free projects pause after ~1 week idle, so the sweep keeps storage awake. | R2 asks for a payment method on file before it can be enabled (verify current terms). PRD §8.4 treats a payment-details requirement as a launch blocker. Firebase Storage now needs the Blaze plan, so it's out. All storage calls go through one server module, so changing provider stays a one-file change. |
 | D3 | Scheduled jobs (deadlines, reminders, auto-close) | **GitHub Actions cron every 30 min** → `POST /api/cron/sweep` with `CRON_SECRET`. Admin/committee dashboard loads also trigger an opportunistic sweep. | Spark plan has no Cloud Functions, and Vercel Hobby cron runs only once a day. Critical-priority escalation fires right away at creation, so it doesn't wait for the sweep. |
 | D4 | Password hashing | `scrypt` from `node:crypto` (N=2^15, r=8, p=1, 16-byte salt, constant-time compare). | Native on Node, with no binary dependency. Revisit only if D1 picks Workers. |
 | D5 | Session model | Firebase client SDK holds the session. API calls send `Authorization: Bearer <ID token>`. No cookie sessions in MVP. | Keeps CSRF off the table. Protected pages fetch on the client, and server routes enforce access. |
@@ -81,9 +81,9 @@ tests/rules/, tests/e2e/
   - [x] Admin SDK `createCustomToken` → client `signInWithCustomToken` → `verifyIdToken`: passes against emulators (`tests/integration/custom-token.test.ts`). Still needs re-checking on a Vercel preview with a real service account.
   - [x] Admin SDK concurrent Firestore transactions (ticket counter) pass against emulators. Still needs re-checking from a deployed route handler.
   - [ ] `sharp` re-encode + EXIF strip inside a deployed route handler
-  - [ ] Signed upload/download URL against R2
+  - [ ] Upload + signed download URL against the Supabase bucket from a deployed route handler
   - [x] `scrypt` N=2^15, r=8, p=1: ~51 ms locally. Needs `maxmem: 64 MiB`, since the default 32 MiB is too small. Re-time on Vercel (target under 300 ms).
-- [ ] Record outcomes of D1–D6 in this file. D1/D2 are assumed to be Vercel + R2 for now, pending the TODO.md checks.
+- [x] Record outcomes of D1–D6 in this file. D1 Vercel, D2 Supabase Storage; D3–D6 as recommended (built that way).
 - [x] CI workflow `.github/workflows/ci.yml`: lint, prettier, typecheck, unit, emulator tests, build (Node 24 + Java 21)
 
 **Exit:** all spike checks pass on the chosen runtime, decisions recorded, CI green on an empty app.
@@ -199,7 +199,8 @@ Server
 - [x] Signed URLs are embedded in `GET /api/complaints/[id]` (no separate URL endpoint). Public viewers only get `public` + `published` photos.
 - [x] `GET /api/complaints/mine` (cursor, 20 per page) and `GET /api/complaints/[id]` shaped by viewer: owner / staff (`complaints.manage`, plus `confidential.view` for confidential) / public. Anyone else gets 404.
 - [x] `GET /api/config`: active categories, blocks and emergency contacts for the form and feed filters
-- [ ] **Real storage backend (blocked on D2).** `src/lib/server/storage.ts` has only a local-disk backend (`.data/uploads`, HMAC-signed `/api/files/...` URLs, 10 min) that works with the emulators. Off emulators, uploads return 503 and the complaint is still saved. Swap in R2 or Supabase Storage there.
+- [x] Storage backends in `src/lib/server/storage.ts`: **Supabase Storage** over its REST API (no SDK dependency; upload, delete, 10 min signed URLs; request shapes unit-tested with a stubbed fetch) when `SUPABASE_URL` + `SUPABASE_SECRET_KEY` are set, else local disk (`.data/uploads`, HMAC-signed `/api/files/...` URLs) with the emulators. Neither configured → uploads return 503 and the complaint is still saved. Photo URL signing failures hide the photos but still load the complaint.
+- [ ] Verify against the real bucket once TODO.md's Supabase step is done (part of the Phase 0 deployed spike)
 
 Client
 - [x] Guided form `/new`: Category (with emergency notice and critical warning) → Location → Details → Visibility and photos (public-photo notice) → Review. Draft and idempotency key persist in localStorage; photos upload after the complaint is saved, so a failed photo never loses the complaint. Big photos are downscaled in the browser first (keeps requests under Vercel's 4.5 MB body limit).
@@ -216,7 +217,7 @@ Tests
 - [x] Integration (complaints.test.ts, 14): FR-03/FR-05 (ticket, event, audit, projection without private data), sequential IDs + idempotent retry, fallback routing, critical escalation, urgent flag ignored, config-validation errors, 5/h limit, confidential absent from feed and 404 to others, public shape for others, `mine` only own, EXIF stripped + WebP + signed URL + forged signature 403, SVG/disguised/corrupt/oversized rejected (FR-04), 3-photo cap and owner-only upload, private photos on confidential complaints, config admin 403/400/200 + audit
 - [x] Browser check (emulators): full guided submit with a critical subcategory, a photo and a rejected SVG; draft cleared after submit; detail with signed photo; second student sees only the public complaint in feed/filters/search, 404 on the confidential one, empty "Mine"; admin edits a category and sees validation errors. Console clean.
 
-**Exit (PRD Phase 2):** ✅ submit → view → track works with no cross-account leakage (on emulators). Photo storage in a deployed environment waits on D2.
+**Exit (PRD Phase 2):** ✅ submit → view → track works with no cross-account leakage (on emulators). Photo storage against the real Supabase bucket is checked in the Phase 0 deployed spike.
 
 ---
 
@@ -238,6 +239,7 @@ Tests
   - [ ] overdue first action → mark escalated + notify lead
   - [ ] resolved past confirmation window → Closed with `confirmation_window_expired`
   - [ ] pre-closure reminder to reporter
+  - [ ] keep-alive: one cheap Supabase Storage call per run, so the free project never pauses (D2)
 - [ ] `.github/workflows/sweep-cron.yml` (D3)
 - [ ] Admin queue UI: filters (status, priority, category, block, assignee), overdue-first sort, bulk-safe single actions, complaint detail with internal timeline
 - [ ] Committee views: public complaints, overdue/escalated list, escalate action
@@ -362,6 +364,7 @@ Email/WhatsApp/SMS, PWA install, maps, staff accounts, multi-hostel, institution
 ## Change log
 
 - 2026-10-21: Plan created from PRD v1.0.
+- 2026-10-22: D1 = Vercel, D2 = Supabase Storage (R2 needs a card). Supabase storage backend added; `origin` set to GitHub and `main` pushed; `.firebaserc` alias `dev` → `campusresolve-dev`.
 - 2026-10-22: Phase 3 landed: config + admin setup screen, complaint submit/route/escalate, photo pipeline (local storage backend until D2), My complaints, detail, public feed, rules + indexes. sharp added as a direct dependency. Fixed `route()` swallowing Next's prerender bail-out (now `unstable_rethrow`), and wrapped `RequireAuth` in Suspense so dynamic routes build.
 - 2026-10-22: Phase 2 landed: roster, activation, login, roles, audit, rate limits; admin roster UI. tsx added for scripts.
 - 2026-10-22: Dark mode darkened to blue-black.

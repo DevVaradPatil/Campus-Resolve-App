@@ -31,7 +31,7 @@ npx firebase emulators:exec --only auth,firestore --project demo-campusresolve "
 
 ## Architecture invariants
 
-Stack: Next.js App Router + TypeScript (strict), Tailwind, Firebase Auth (custom tokens) + Firestore on the **Spark plan** (no Cloud Functions), image storage on R2 or a fallback (decision D2), hosting decided in D1.
+Stack: Next.js App Router + TypeScript (strict), Tailwind, Firebase Auth (custom tokens) + Firestore on the **Spark plan** (no Cloud Functions), photo storage on Supabase Storage (D2), hosted on Vercel Hobby (D1).
 
 - **All writes go through Next.js route handlers using the Admin SDK.** `firestore.rules` denies every client write. Client SDK reads are a narrow allowlist: `publicComplaints` and the user's own `notifications`. Everything else is served by API routes that return role-shaped DTOs.
 - **The Admin SDK bypasses rules**, so every privileged route must run, in order: `requireUser()` (verifies the ID token, loads `users/{uid}`, rejects `active=false`) → `requirePermission()` → `zod` parse → transaction. Never rely on client-side role checks.
@@ -42,7 +42,7 @@ Stack: Next.js App Router + TypeScript (strict), Tailwind, Firebase Auth (custom
 - **Sessions:** the Firebase client SDK holds the session, and the client sends `Authorization: Bearer <ID token>` via `api()` in `src/lib/client/api.ts`. Signed-in screens are client components behind `RequireAuth`. Never put authenticated data in server-rendered output. Every account change that should end sessions calls `revokeSessions()`.
 - **Audit:** every state-changing server function writes `writeAudit()` in the same transaction/batch. Audit meta never contains passwords, codes, tokens or complaint bodies.
 - **Scheduled work** (deadline escalation, reminders, auto-close) runs in the secret-protected `POST /api/cron/sweep`, triggered by GitHub Actions. It must be idempotent and bounded.
-- **Uploads:** all object storage goes through `src/lib/server/storage.ts` (local-disk backend under `.data/uploads` until D2 picks a provider). Check magic bytes (JPEG/PNG/WebP only), re-encode with `sharp` to strip EXIF, use server-generated object keys, and serve private images only via short-lived signed URLs.
+- **Uploads:** all object storage goes through `src/lib/server/storage.ts` (Supabase Storage via REST when `SUPABASE_URL`/`SUPABASE_SECRET_KEY` are set, otherwise a local-disk backend under `.data/uploads` that only works with the emulators). Check magic bytes (JPEG/PNG/WebP only), re-encode with `sharp` to strip EXIF, use server-generated object keys, and serve private images only via short-lived signed URLs.
 - **Quota-aware:** paginate everything (≤20 per page), keep listeners scoped to visible records, and read dashboards from pre-aggregated `stats` docs. On failure, surface a clear error and never drop a submission.
 
 ## UI conventions

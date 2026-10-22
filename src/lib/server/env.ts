@@ -3,10 +3,8 @@ import { z } from "zod";
 
 // Server-side env, validated once on first import. Add variables here as the code that needs them lands.
 // `KEY=` with nothing after it (as in .env.example) means unset.
-const secret = z.preprocess(
-  (v) => (v === "" ? undefined : v),
-  z.string().min(32, "must be at least 32 characters").optional(),
-);
+const blank = (v: unknown) => (v === "" ? undefined : v);
+const secret = z.preprocess(blank, z.string().min(32, "must be at least 32 characters").optional());
 
 const schema = z
   .object({
@@ -16,6 +14,10 @@ const schema = z
     FIREBASE_PRIVATE_KEY: z.string().optional(),
     ACTIVATION_CODE_PEPPER: secret,
     RATE_LIMIT_IP_SALT: secret,
+    // Photo storage (plan.md D2). Unset → local disk, emulators only.
+    SUPABASE_URL: z.preprocess(blank, z.url().optional()),
+    SUPABASE_SECRET_KEY: z.preprocess(blank, z.string().min(20).optional()),
+    SUPABASE_BUCKET: z.preprocess(blank, z.string().default("attachments")),
   })
   .refine(
     (e) => e.NEXT_PUBLIC_USE_EMULATORS || (e.FIREBASE_CLIENT_EMAIL && e.FIREBASE_PRIVATE_KEY),

@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "demo-campusresolve"
+    "default": "demo-campusresolve",
+    "dev": "campusresolve-dev"
   }
 }

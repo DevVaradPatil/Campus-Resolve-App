@@ -6,35 +6,36 @@ Secrets go in `.env.local` (dev) or the host's env settings (prod). **Never comm
 
 ## Before Phase 0 (needed to start)
 
-- [ ] **Decide hosting (D1 in plan.md):** read the Vercel Hobby terms (personal, non-commercial use) and decide whether a free, student-led hostel pilot qualifies. Tell Claude: Vercel or Cloudflare Workers.
-- [ ] **Check image storage billing (D2):** in the Cloudflare dashboard, see whether enabling R2 asks for a card/PayPal. If it does and you won't add one, tell Claude to use the Supabase Storage fallback. Until this is decided, photo uploads only work against the local emulators (complaints themselves work everywhere).
-- [ ] Create a GitHub repository (private is fine), then add it as `origin` and push `main` (Claude has made the local repo)
-- [x] ~~Install Node + Firebase CLI~~. Node 24 and Java 21 are present, and the Firebase CLI is a project devDependency. Run `npx firebase login` once before any real deploy.
-- [ ] Create a **Vercel** account (Hobby) and import the GitHub repo, so Claude can run the deployed runtime spike. Add the dev Firebase/R2 env vars from below in Vercel → Settings → Environment Variables (Preview).
-- [ ] Once the dev Firebase project exists: run `npx firebase use --add` and pick it with alias `dev`. Local emulator work keeps using the offline `demo-campusresolve` project.
+- [x] ~~Decide hosting (D1)~~: **Vercel** (Hobby).
+- [x] ~~Image storage billing (D2)~~: R2 wants a card, so **Supabase Storage** (free tier, no card). Setup is below.
+- [x] ~~GitHub repo~~: `origin` is https://github.com/DevVaradPatil/Campus-Resolve-App and `main` is pushed.
+- [x] ~~Install Node + Firebase CLI~~. Node 24 and Java 21 are present, and the Firebase CLI is a project devDependency.
+- [x] ~~`firebase use --add`~~: `.firebaserc` has alias `dev` → `campusresolve-dev`. Local emulator work keeps using the offline `demo-campusresolve` project.
+- [ ] **Vercel → import the repo.** In Vercel (account varadapatil123@gmail.com): Account Settings → Authentication / Git → connect the GitHub account `DevVaradPatil`, then Add New → Project → import `Campus-Resolve-App`. Framework preset Next.js, no other build settings. Then add the env vars listed in "Vercel environment variables" below for **Preview and Production**, and redeploy.
+- [ ] Run `npx firebase login` once (opens a browser), then deploy the security rules and indexes to the dev project: `npx firebase deploy --only firestore --project dev`
 
 ## Firebase — development project (Phase 0)
 
-- [ ] Create Firebase project `campusresolve-dev` on the **Spark (free)** plan. Don't upgrade to Blaze.
-- [ ] Enable **Authentication** (no providers needed; custom tokens work without one)
-- [ ] Create a **Firestore** database (Native mode, region `asia-south1` Mumbai)
-- [ ] Register a Web app → copy its config into `.env.local`:
-  `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_APP_ID`
-- [ ] Project settings → Service accounts → generate a private key → put its values in `.env.local`:
-  `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`. Delete the downloaded JSON afterwards, or store it outside the repo.
-- [ ] In Google Cloud IAM for the project, make sure the service account has **Service Account Token Creator** (needed for custom tokens)
+- [x] ~~Create Firebase project `campusresolve-dev`~~ (keep it on **Spark**, never upgrade to Blaze)
+- [x] ~~Enable Authentication~~
+- [x] ~~Create Firestore~~. Check it's in **Native mode**. The region can't change now; `asia-south1` (Mumbai) was the target.
+- [x] ~~Register a Web app~~. Its config values go into Vercel (below). The snippet's `getAnalytics` / `measurementId` aren't used: the app has no analytics, which is a privacy choice.
+- [ ] Project settings → Service accounts → **Generate new private key**. From the JSON, put `client_email` → `FIREBASE_CLIENT_EMAIL` and `private_key` → `FIREBASE_PRIVATE_KEY` into Vercel (paste the key exactly, including the `-----BEGIN…` lines). Then delete the JSON file or store it outside the repo. Never paste it in chat.
 
-## Image storage — development (Phase 0)
+## Image storage — Supabase (D2)
 
-If R2 (D2):
-- [ ] Create bucket `campusresolve-dev` (private, no public access)
-- [ ] Create an R2 API token scoped to that bucket (Object Read & Write) → `.env.local`:
-  `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`
-- [ ] Set a Cloudflare usage notification for R2
+- [ ] At supabase.com, create a free organization + project (no card needed). Region **South Asia (Mumbai)**. Save the database password somewhere, though the app doesn't use the database.
+- [ ] Storage → **New bucket** `attachments`, with **Public bucket OFF**. Under its settings, set the file size limit to 5 MB and allowed MIME types to `image/webp`.
+- [ ] Project Settings → API Keys → copy the **Project URL** and a **secret key** (`sb_secret_…`, or the legacy `service_role` key) into Vercel as `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, plus `SUPABASE_BUCKET=attachments`. The secret key bypasses all Supabase security: server env only, never `NEXT_PUBLIC_`.
+- [ ] Note: free Supabase projects **pause after ~1 week of no activity**, which hides photos (complaints keep working) until you press Restore in the dashboard. The Phase 4 sweep cron will touch storage regularly to keep it awake.
 
-If Supabase fallback (D2):
-- [ ] Create a free Supabase project, plus a private storage bucket `attachments`
-- [ ] `.env.local`: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_BUCKET`
+## Vercel environment variables
+
+Set these in Vercel → Project → Settings → Environment Variables. **Don't** set `NEXT_PUBLIC_USE_EMULATORS` there.
+- [ ] Public web config (from the Firebase web app snippet): `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` (`campusresolve-dev.firebaseapp.com`), `NEXT_PUBLIC_FIREBASE_PROJECT_ID` (`campusresolve-dev`), `NEXT_PUBLIC_FIREBASE_APP_ID`
+- [ ] Server: `FIREBASE_PROJECT_ID` (`campusresolve-dev`), `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
+- [ ] Secrets: `ACTIVATION_CODE_PEPPER`, `RATE_LIMIT_IP_SALT` (generate as in "App secrets" below)
+- [ ] Storage: `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, `SUPABASE_BUCKET`
 
 ## App secrets (Phase 2)
 

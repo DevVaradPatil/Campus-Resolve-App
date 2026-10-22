@@ -67,7 +67,7 @@ export async function uploadPhoto(
   complaintId: string,
   photo: Blob,
   onProgress: (pct: number) => void,
-): Promise<{ id: string; url: string }> {
+): Promise<{ id: string }> {
   const token = await auth.currentUser?.getIdToken();
   const form = new FormData();
   form.append("photo", photo, "photo");
@@ -82,7 +82,7 @@ export async function uploadPhoto(
       try {
         data = JSON.parse(xhr.responseText);
       } catch {}
-      if (xhr.status >= 200 && xhr.status < 300) resolve(data as { id: string; url: string });
+      if (xhr.status >= 200 && xhr.status < 300) resolve(data as { id: string });
       else reject(new ApiError(xhr.status, data.error ?? "Upload failed."));
     };
     xhr.send(form);
