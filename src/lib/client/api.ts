@@ -1,4 +1,23 @@
-import { auth } from "./firebase";
+import { getToken } from "firebase/app-check";
+import { appCheck, auth } from "./firebase";
+
+/** Session token, plus the App Check token when App Check is on. A failed App Check fetch just
+ * leaves the header off; the server decides whether that matters (monitor vs enforce). */
+async function authHeaders(): Promise<Record<string, string>> {
+  const [token, check] = await Promise.all([
+    auth.currentUser?.getIdToken(),
+    appCheck
+      ? getToken(appCheck).then(
+          (r) => r.token,
+          () => null,
+        )
+      : null,
+  ]);
+  return {
+    ...(token && { authorization: `Bearer ${token}` }),
+    ...(check && { "x-firebase-appcheck": check }),
+  };
+}
 
 export class ApiError extends Error {
   constructor(
@@ -18,14 +37,14 @@ export async function api<T>(
   path: string,
   { method = "GET", body }: { method?: string; body?: unknown } = {},
 ): Promise<T> {
-  const token = await auth.currentUser?.getIdToken();
+  const headers = await authHeaders();
   let res: Response;
   try {
     res = await fetch(path, {
       method,
       headers: {
         ...(body !== undefined && { "content-type": "application/json" }),
-        ...(token && { authorization: `Bearer ${token}` }),
+        ...headers,
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
@@ -68,13 +87,13 @@ export async function uploadPhoto(
   photo: Blob,
   onProgress: (pct: number) => void,
 ): Promise<{ id: string }> {
-  const token = await auth.currentUser?.getIdToken();
+  const headers = await authHeaders();
   const form = new FormData();
   form.append("photo", photo, "photo");
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `/api/complaints/${complaintId}/photos`);
-    if (token) xhr.setRequestHeader("authorization", `Bearer ${token}`);
+    for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress((e.loaded / e.total) * 100);
     xhr.onerror = () => reject(new ApiError(0, "Can't reach CampusResolve right now. Try again."));
     xhr.onload = () => {
@@ -91,8 +110,7 @@ export async function uploadPhoto(
 
 /** Authenticated file download (e.g. CSV export): fetches with the ID token, then saves. */
 export async function apiDownload(path: string, filename: string) {
-  const token = await auth.currentUser?.getIdToken();
-  const res = await fetch(path, { headers: token ? { authorization: `Bearer ${token}` } : {} });
+  const res = await fetch(path, { headers: await authHeaders() });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new ApiError(res.status, data.error ?? "Download failed.", data.fields);

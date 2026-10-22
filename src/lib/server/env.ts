@@ -25,6 +25,9 @@ const schema = z
     FIREBASE_PRIVATE_KEY: optional,
     ACTIVATION_CODE_PEPPER: secret,
     RATE_LIMIT_IP_SALT: secret,
+    // App Check (reCAPTCHA v3) on API routes: off | monitor (log, allow) | enforce (refuse).
+    // Unset → monitor in a real deployment, off with the emulators.
+    APP_CHECK: z.preprocess(blank, z.enum(["off", "monitor", "enforce"]).optional()),
     // PRD §14.2 deletion after a year. Stays off until the owner approves the policy (TODO.md).
     RETENTION_ENABLED: z.preprocess(blank, z.stringbool().default(false)),
     // Shared secret for POST /api/cron/sweep (D3). Unset → the endpoint refuses every call.
@@ -48,6 +51,7 @@ const schema = z
   // Fixed, public dev secrets are acceptable only against the offline emulators.
   .transform((e) => ({
     ...e,
+    APP_CHECK: e.APP_CHECK ?? (e.NEXT_PUBLIC_USE_EMULATORS ? "off" : "monitor"),
     FIREBASE_PROJECT_ID: e.FIREBASE_PROJECT_ID!,
     ACTIVATION_CODE_PEPPER: e.ACTIVATION_CODE_PEPPER ?? "dev-only-activation-pepper-not-secret",
     RATE_LIMIT_IP_SALT: e.RATE_LIMIT_IP_SALT ?? "dev-only-rate-limit-salt-not-secret!",

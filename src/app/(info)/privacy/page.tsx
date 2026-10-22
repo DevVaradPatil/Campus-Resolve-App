@@ -56,7 +56,10 @@ export default function PrivacyPage() {
       <h2>Where it&apos;s kept</h2>
       <p>
         Data is stored with Google Firebase and photos with Supabase, both on free plans, and the
-        app runs on Vercel. There is no advertising, analytics or tracking.
+        app runs on Vercel. To keep out automated abuse, the app uses Google reCAPTCHA (through
+        Firebase App Check), which looks at how the page is being used; Google&apos;s{" "}
+        <a href="https://policies.google.com/privacy">privacy policy</a> applies to that. There is
+        no advertising, analytics or tracking.
       </p>
       <h2>How long</h2>
       <p>

@@ -314,7 +314,7 @@ describe("sweep (FR-11)", () => {
     expect((await call("Bearer wrong-secret")).status).toBe(401);
     const ok = await call(`Bearer ${process.env.CRON_SECRET}`);
     expect(ok.status).toBe(200);
-    expect(await ok.json()).toMatchObject({ escalated: 0, closed: 0, storage: "ok" });
+    expect(await ok.json()).toMatchObject({ escalated: 0, closed: 0, storage: "local ok" });
   });
 });
 

@@ -9,7 +9,7 @@ if (env.NEXT_PUBLIC_USE_EMULATORS) {
   process.env.FIRESTORE_EMULATOR_HOST ??= "127.0.0.1:8080";
 }
 
-const app =
+export const adminApp =
   getApps()[0] ??
   initializeApp(
     env.NEXT_PUBLIC_USE_EMULATORS
@@ -24,5 +24,5 @@ const app =
         },
   );
 
-export const adminAuth = getAuth(app);
-export const adminDb = getFirestore(app);
+export const adminAuth = getAuth(adminApp);
+export const adminDb = getFirestore(adminApp);

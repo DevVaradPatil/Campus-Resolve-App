@@ -98,8 +98,9 @@ export async function sweep(now = Date.now()) {
   ).filter(Boolean).length;
 
   // Keeps the free Supabase project from pausing (D2). A failure here mustn't fail the sweep.
+  // Reports the backend it reached, so a Sweep run in GitHub Actions doubles as a storage check.
   const storage = await ping().then(
-    () => "ok",
+    (backend) => (backend === "none" ? "not configured" : `${backend} ok`),
     (e) => (console.error("Storage keep-alive failed", e), "failed"),
   );
 

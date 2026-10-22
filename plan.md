@@ -17,7 +17,7 @@ admin workflow & escalation → dashboards & notifications → hardening & recov
 | 4 | Workflow: assign, status, deadlines, escalate, resolve, close, reopen | ✅ Done (reminders/notifications move to Phase 5) |
 | 5 | Community & notifications | ✅ Done (follow-complaints skipped, optional) |
 | 6 | Dashboards, contacts, analytics, export | ✅ Done |
-| 7 | Hardening & recovery | 🟨 Done except App Check + real restore test (owner keys) |
+| 7 | Hardening & recovery | 🟨 Done except a real restore test (owner's age key + restore project) |
 | 8 | Deploy & pilot | ⬜ Not started |
 
 Legend: ⬜ not started · 🟨 in progress · ✅ done (exit criteria met)
@@ -321,7 +321,7 @@ Security
 - [x] Rate limits: login, activation, password change, complaint submit (5/h), uploads (10/h, now tested), support (30/10 min), comments (10/10 min), reports (10/h). Not limited on purpose: admin-only actions (behind `requireUser` + permission) and one-shot reporter actions (confirm, reopen, feedback), which the lifecycle allows once per state.
 - [x] Security headers in `next.config.ts`: CSP, HSTS, `nosniff`, `Referrer-Policy: same-origin` (complaint ids are in URLs), `X-Frame-Options: DENY` + `frame-ancestors 'none'` (confirmed: the app can't even frame itself), `Permissions-Policy`, COOP. *Changed from plan:* **static CSP, not nonce-based.** Nonces need every page rendered per request; pages are static client shells and user content is always rendered as text. `script-src 'self' 'unsafe-inline'` (no `unsafe-eval` in production), `connect-src` limited to Firebase Auth/Firestore (+ emulators locally), `img-src` adds the Supabase host when configured. Upgrade path: `proxy.ts` nonces. Checked against a production build: sign-in and every screen work, no CSP errors.
 - [x] CORS: API routes send no `Access-Control-Allow-*` headers, so browsers block cross-origin reads; auth is a Bearer token, never a cookie, so there's no CSRF surface.
-- [ ] App Check (reCAPTCHA v3): **blocked** on the owner's reCAPTCHA key (TODO.md)
+- [x] App Check (reCAPTCHA v3): client attaches the token to every API call (`authHeaders()`), `route()` verifies it with the Admin SDK. `APP_CHECK=off|monitor|enforce`; default **monitor** in a real deployment (logs `App Check missing/invalid`, lets the request through), off with the emulators. Cron and signed-file routes opt out. CSP allows Google's reCAPTCHA scripts/frame and the App Check endpoint only when a site key is set; the floating badge is hidden and the required attribution sits under the sign-in forms; privacy draft discloses it. Switch to `enforce` once logs show valid tokens (LAUNCH.md step 10).
 - [x] Error handling: `route()` returns a generic 500 and logs server-side only (test asserts no message or stack reaches the client). Sentry is optional and waits on the owner's choice.
 - [x] CI: `npm audit --omit=dev --audit-level=high` and a gitleaks secret scan over full history. Local history scan clean.
 - [x] Security acceptance (PRD §15.2), automated: cross-account access by URL/id (Phase 3), role/owner/priority/assignment manipulation (Phase 4), committee without confidential access (Phases 4-6), expired/consumed codes (Phase 2), login and **upload** rate limits, malformed uploads (Phase 3), **expired/forged photo links refused** (no permanent URLs), admin actions audited, **errors don't leak**, deactivation (Phase 2)
@@ -347,13 +347,15 @@ Ops docs
 
 ## Phase 8 — Deploy & pilot
 
+- [x] `docs/LAUNCH.md`: launch blockers, Definition of Done and operational acceptance mapped to status; cut-over steps (Vercel Preview → dev project, Production → prod project); first-week cadence; pilot review metrics
+- [x] Sweep reports the storage backend it reached (`supabase ok` / `local ok` / `not configured`), so each GitHub Actions run doubles as a storage health check
 - [ ] Separate dev and prod Firebase projects + storage buckets + secrets (§15.4)
 - [ ] Deploy rules + indexes from version control (`firebase deploy --only firestore`)
 - [ ] Production deploy on the D1 host with HTTPS on the free subdomain
 - [ ] Sweep cron pointed at production
 - [ ] Seed production categories, locations, approved contacts and policies (from TODO.md approvals)
 - [ ] Bootstrap prod admin, import pilot roster (10–25 students), distribute activation codes
-- [ ] Pilot runbook: monitoring cadence, who watches the critical queue, feedback form
+- [x] Pilot runbook: monitoring cadence, who watches the critical queue, feedback (OPERATIONS.md + LAUNCH.md)
 - [ ] Pilot review: resolution rate, deadline fit, routing accuracy, defects → adjust policies
 - [ ] Definition of Done (PRD §19) checklist signed off
 
@@ -381,6 +383,7 @@ Email/WhatsApp/SMS, PWA install, maps, staff accounts, multi-hostel, institution
 ## Change log
 
 - 2026-10-21: Plan created from PRD v1.0.
+- 2026-10-22: App Check (monitor by default), sweep storage health check, docs/LAUNCH.md.
 - 2026-10-22: Phase 7: security headers (static CSP), CI audit + secret scan, retention (off until approved), encrypted backup/restore with FR-16 test, about/privacy/rules pages, ops and recovery docs, axe pass.
 - 2026-10-22: Phase 6 landed: daily stats counters, §7.4 analytics, role-shaped dashboards, contact directory, CSV export.
 - 2026-10-22: Phase 5 slice 3: reports + moderation queue, duplicate merge, generic reporter name. Phase 5 done.

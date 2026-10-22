@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { HttpError, route } from "./http";
 
 describe("route() error handling (PRD §15.2)", () => {
@@ -21,5 +21,44 @@ describe("route() error handling (PRD §15.2)", () => {
     })(new Request("http://localhost/x"), undefined);
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "Already done." });
+  });
+});
+
+describe("App Check in route() (PRD §12.3)", () => {
+  const load = async (mode: string) => {
+    vi.stubEnv("APP_CHECK", mode);
+    vi.resetModules();
+    return (await import("./http")).route;
+  };
+  const ok = async () => Response.json({ ok: true });
+  const call = (r: Awaited<ReturnType<typeof load>>, header?: string, opts = {}) =>
+    r(ok, opts)(
+      new Request("http://localhost/api/x", {
+        headers: header ? { "x-firebase-appcheck": header } : {},
+      }),
+      undefined,
+    );
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("enforce refuses missing and invalid tokens", async () => {
+    const r = await load("enforce");
+    expect((await call(r)).status).toBe(401);
+    expect((await call(r, "not-a-real-token")).status).toBe(401);
+  });
+
+  it("monitor logs and lets the request through", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const r = await load("monitor");
+    expect((await call(r)).status).toBe(200);
+    expect(warn).toHaveBeenCalledWith("App Check missing: GET /api/x");
+  });
+
+  it("off, and routes that opt out, skip the check", async () => {
+    expect((await call(await load("off"))).status).toBe(200);
+    expect((await call(await load("enforce"), undefined, { appCheck: false })).status).toBe(200);
   });
 });

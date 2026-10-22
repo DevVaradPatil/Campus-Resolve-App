@@ -13,7 +13,18 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
             CampusResolve
           </p>
           {children}
-          <nav aria-label="About this pilot" className="mt-10 flex flex-wrap gap-x-5 text-sm">
+          <p className="mt-10 text-xs text-muted">
+            This site is protected by reCAPTCHA and the Google{" "}
+            <a href="https://policies.google.com/privacy" className="underline">
+              Privacy Policy
+            </a>{" "}
+            and{" "}
+            <a href="https://policies.google.com/terms" className="underline">
+              Terms of Service
+            </a>{" "}
+            apply.
+          </p>
+          <nav aria-label="About this pilot" className="mt-2 flex flex-wrap gap-x-5 text-sm">
             <Link href="/about" className="inline-flex min-h-11 items-center text-ink underline">
               About
             </Link>

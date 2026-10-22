@@ -85,13 +85,14 @@ export async function objectExists(key: string) {
 }
 
 /** Cheap authenticated call so the free Supabase project never counts as idle (D2). */
-export async function ping() {
-  if (supabase)
-    await storageApi(`object/list/${env.SUPABASE_BUCKET}`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ prefix: "", limit: 1 }),
-    });
+export async function ping(): Promise<"supabase" | "local" | "none"> {
+  if (!supabase) return env.NEXT_PUBLIC_USE_EMULATORS ? "local" : "none";
+  await storageApi(`object/list/${env.SUPABASE_BUCKET}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ prefix: "", limit: 1 }),
+  });
+  return "supabase";
 }
 
 const sign = (key: string, exp: number) =>

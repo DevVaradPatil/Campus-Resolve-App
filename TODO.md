@@ -32,9 +32,9 @@ These run on your machine against `campusresolve-dev`, using the same values as 
 
 ## Image storage — Supabase (D2)
 
-- [ ] At supabase.com, create a free organization + project (no card needed). Region **South Asia (Mumbai)**. Save the database password somewhere, though the app doesn't use the database.
-- [ ] Storage → **New bucket** `attachments`, with **Public bucket OFF**. Under its settings, set the file size limit to 5 MB and allowed MIME types to `image/webp`.
-- [ ] Project Settings → API Keys → copy the **Project URL** and a **secret key** (`sb_secret_…`, or the legacy `service_role` key) into Vercel as `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, plus `SUPABASE_BUCKET=attachments`. The secret key bypasses all Supabase security: server env only, never `NEXT_PUBLIC_`.
+- [x] At supabase.com, create a free organization + project (no card needed). Region **South Asia (Mumbai)**. Save the database password somewhere, though the app doesn't use the database.
+- [x] Storage → **New bucket** `attachments`, with **Public bucket OFF**. Under its settings, set the file size limit to 5 MB and allowed MIME types to `image/webp`.
+- [x] Project Settings → API Keys → copy the **Project URL** and a **secret key** (`sb_secret_…`, or the legacy `service_role` key) into Vercel as `SUPABASE_URL`, `SUPABASE_SECRET_KEY`, plus `SUPABASE_BUCKET=attachments`. The secret key bypasses all Supabase security: server env only, never `NEXT_PUBLIC_`.
 - [ ] Note: free Supabase projects **pause after ~1 week of no activity**, which hides photos (complaints keep working) until you press Restore in the dashboard. The Phase 4 sweep cron will touch storage regularly to keep it awake.
 
 ## Vercel environment variables
@@ -79,7 +79,7 @@ Generate each with `node -e "console.log(require('crypto').randomBytes(32).toStr
 
 ## Phase 7 — Hardening & recovery
 
-- [ ] Register a **reCAPTCHA v3** site for App Check (free) → `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`, and enable App Check in the Firebase console
+- [x] Register a **reCAPTCHA v3** site for App Check (free) → `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`, and enable App Check in the Firebase console
 - [ ] Optional: free **Sentry** account → `SENTRY_DSN` (skip if you'd rather not send error data to a third party)
 - [ ] Install `age` and generate the backup keypair (`age-keygen -o backup.key`). Give Claude **only the public key**. Keep `backup.key` offline (e.g. a password manager or USB), never in the repo. Then take backups weekly as in [docs/RECOVERY.md](docs/RECOVERY.md).
 - [ ] Do one real restore test into `campusresolve-restore-test` following docs/RECOVERY.md, and log it there.
@@ -88,6 +88,10 @@ Generate each with `node -e "console.log(require('crypto').randomBytes(32).toStr
 - [ ] Create a second Firebase project `campusresolve-restore-test` (Spark) to restore backups into
 
 ## Phase 8 — Production
+
+The full cut-over sequence, with what Claude can run, is in [docs/LAUNCH.md](docs/LAUNCH.md).
+
+- [ ] Confirm the Vercel Hobby terms allow this non-commercial student pilot (PRD launch blocker 2)
 
 - [ ] Create Firebase project `campusresolve-prod` (Spark) and repeat the Firebase steps above with **new** keys
 - [ ] Create the production storage bucket + a new scoped token (never reuse the dev keys)
